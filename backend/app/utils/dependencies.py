@@ -85,3 +85,22 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Admin access required"
         )
     return current_user
+
+
+async def get_current_user_ws(token: str, db: Session) -> Optional[User]:
+    """Get current user for WebSocket connection"""
+    # В режиме разработки/тестирования возвращаем тестового пользователя
+    if settings.environment == "development":
+        return db.query(User).filter(User.telegram_id == 123456789).first()
+
+    # В production проверяем токен
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+        telegram_id: int = payload.get("sub")
+        if telegram_id is None:
+            return None
+    except JWTError:
+        return None
+
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    return user

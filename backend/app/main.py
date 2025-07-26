@@ -76,7 +76,7 @@ app.include_router(bookings.router, prefix="/api/bookings", tags=["bookings"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(history_api.router, prefix="/api/history", tags=["history"])
-app.include_router(websocket.router, prefix="/api", tags=["websocket"])
+#app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 
 
 @app.get("/")
