@@ -2,26 +2,20 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Копируем package files
+# Copy package files
 COPY package*.json ./
 
-# Устанавливаем зависимости
+# Install all dependencies
 RUN npm install
 
-# Копируем остальные файлы
+# Copy all files
 COPY . .
 
-# Собираем проект
+# Build the app
 RUN npm run build
-
-# Устанавливаем serve для production
-RUN npm install -g serve
-
-# Указываем порт по умолчанию
-ENV PORT=3000
 
 # Expose port
 EXPOSE 3000
 
-# Запускаем приложение с портом по умолчанию
-CMD serve -s dist -l ${PORT:-3000}
+# Start the server
+CMD ["node", "server.js"]
