@@ -1,5 +1,8 @@
 import axios from 'axios';
-import { API_BASE_URL } from '../utils/constants';
+// import { API_BASE_URL } from '../utils/constants';
+
+// Хардкодим URL напрямую
+const API_BASE_URL = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -26,7 +29,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Токен истек, очищаем
       localStorage.removeItem('auth_token');
-      window.location.reload();
+      // Не перезагружаем страницу в development
+      // window.location.reload();
     }
 
     return Promise.reject(error);
