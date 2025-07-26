@@ -7,8 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite preview --port $PORT --host 0.0.0.0",
-    "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+    "start": "serve dist -l $PORT"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -21,9 +20,9 @@
     "@heroicons/react": "^2.0.18",
     "clsx": "^2.0.0",
     "react-hot-toast": "^2.4.1",
-    "serve": "^14.2.1",
     "chart.js": "^4.4.1",
-    "react-chartjs-2": "^5.2.0"
+    "react-chartjs-2": "^5.2.0",
+    "serve": "^14.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
