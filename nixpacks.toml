@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["python310", "nodejs", "postgresql"]
+
+[phases.install]
+cmds = ["echo 'Installing dependencies'"]
+
+[phases.build]
+cmds = ["echo 'Building project'"]
+
+[start]
+cmd = "echo 'Starting project'"
