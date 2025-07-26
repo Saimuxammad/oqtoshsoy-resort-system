@@ -1,25 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict
 
 from ..database import get_db
 from ..schemas.user import User, TelegramAuthData
 from ..models.user import User as UserModel
 from ..utils.telegram import verify_telegram_auth, is_admin_user
-from ..utils.dependencies import get_current_user, create_access_token
+from ..utils.dependencies import create_access_token
 from ..config import settings
 
 router = APIRouter()
 
 
-@router.post("/telegram", response_model=Dict)
+@router.post("/telegram")
 async def telegram_auth(auth_data: TelegramAuthData, db: Session = Depends(get_db)):
     """Authenticate user via Telegram Web App"""
 
-    # В режиме разработки принимаем любые данные
+    # В development режиме упрощенная проверка
     if settings.environment == "development":
-        # Проверяем или создаем пользователя
         user = db.query(UserModel).filter(UserModel.telegram_id == auth_data.id).first()
 
         if not user:
@@ -28,7 +27,7 @@ async def telegram_auth(auth_data: TelegramAuthData, db: Session = Depends(get_d
                 first_name=auth_data.first_name,
                 last_name=auth_data.last_name,
                 username=auth_data.username,
-                is_admin=True  # В dev режиме все админы
+                is_admin=is_admin_user(auth_data.id)
             )
             db.add(user)
         else:
@@ -53,11 +52,11 @@ async def telegram_auth(auth_data: TelegramAuthData, db: Session = Depends(get_d
             }
         }
 
-    # Production код с проверкой
+    # Production режим с полной проверкой
     if not verify_telegram_auth(auth_data.dict()):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication data"
         )
 
-    # ... остальной код для production
+    # Создаем или обновляем пользовател
