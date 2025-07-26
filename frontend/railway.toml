@@ -4,4 +4,4 @@ nixPkgs = ["nodejs-18_x"]
 buildCommand = "npm install && npm run build"
 
 [deploy]
-startCommand = "npx serve dist -l $PORT -s"
+startCommand = "node server.js"
