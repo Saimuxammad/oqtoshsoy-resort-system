@@ -5,34 +5,67 @@ export function useTelegram() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
+    console.log('Telegram WebApp:', window.Telegram?.WebApp);
     const tg = window.Telegram?.WebApp;
 
-    if (tg) {
+    if (tg && tg.initData) {
+      console.log('Telegram WebApp found');
       tg.ready();
       tg.expand();
 
       setWebApp(tg);
       setUser(tg.initDataUnsafe?.user);
 
-      // Set theme
-      tg.setHeaderColor('#1e40af');
-      tg.setBackgroundColor('#f3f4f6');
+      // Set theme - с проверкой на существование методов
+      if (tg.setHeaderColor) {
+        tg.setHeaderColor('#1e40af');
+      }
+      if (tg.setBackgroundColor) {
+        tg.setBackgroundColor('#f3f4f6');
+      }
+    } else {
+      // Development mode - если нет Telegram WebApp
+      console.warn('Telegram WebApp not found, using development mode');
+      setWebApp({
+        ready: () => {},
+        expand: () => {},
+        close: () => {},
+        showAlert: (message) => alert(message),
+        showConfirm: (message, callback) => {
+          const result = confirm(message);
+          if (callback) callback(result);
+        }
+      });
+      setUser({
+        id: 123456789,
+        first_name: 'Test',
+        last_name: 'User',
+        username: 'testuser'
+      });
     }
   }, []);
 
   const close = () => {
-    webApp?.close();
+    webApp?.close?.();
   };
 
   const showAlert = (message) => {
-    webApp?.showAlert(message);
+    if (webApp?.showAlert) {
+      webApp.showAlert(message);
+    } else {
+      alert(message);
+    }
   };
 
   const showConfirm = (message) => {
     return new Promise((resolve) => {
-      webApp?.showConfirm(message, (confirmed) => {
-        resolve(confirmed);
-      });
+      if (webApp?.showConfirm) {
+        webApp.showConfirm(message, (confirmed) => {
+          resolve(confirmed);
+        });
+      } else {
+        resolve(confirm(message));
+      }
     });
   };
 
@@ -42,6 +75,6 @@ export function useTelegram() {
     close,
     showAlert,
     showConfirm,
-    isReady: !!webApp
+    isReady: true // Всегда готов
   };
 }

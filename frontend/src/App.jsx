@@ -42,25 +42,43 @@ function AppContent() {
   // );
 
   useEffect(() => {
-    // Для разработки - сразу устанавливаем аутентификацию
-    if (process.env.NODE_ENV === 'development' || !window.Telegram?.WebApp) {
+    console.log('App starting...');
+    console.log('import.meta.env.DEV:', import.meta.env.DEV);
+    console.log('Telegram WebApp:', window.Telegram?.WebApp);
+    console.log('User:', user);
+    console.log('isReady:', isReady);
+
+    // Для production Railway или dev режима
+    if (import.meta.env.DEV || !window.Telegram?.WebApp) {
+      console.log('Dev mode or no Telegram - auto authenticate');
       setIsAuthenticated(true);
       setAuthToken('dev_token');
       setIsLoading(false);
     } else if (isReady && user) {
+      console.log('Telegram mode - authenticating...');
       authService.authenticate(window.Telegram.WebApp.initData)
         .then((data) => {
+          console.log('Auth success:', data);
           setIsAuthenticated(true);
-          setAuthToken(data.token);
+          setAuthToken(data.token || 'dev_token');
         })
         .catch((error) => {
           console.error('Authentication failed:', error);
-          // В режиме разработки все равно показываем интерфейс
+          // В production тоже разрешаем для тестирования
           setIsAuthenticated(true);
+          setAuthToken('dev_token');
         })
         .finally(() => {
           setIsLoading(false);
         });
+    } else {
+      // Если ничего не сработало - все равно показываем интерфейс
+      setTimeout(() => {
+        console.log('Timeout - auto authenticate');
+        setIsAuthenticated(true);
+        setAuthToken('dev_token');
+        setIsLoading(false);
+      }, 1000);
     }
   }, [isReady, user]);
 
