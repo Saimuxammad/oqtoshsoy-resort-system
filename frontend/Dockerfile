@@ -5,9 +5,8 @@ WORKDIR /app
 # Копируем package files
 COPY package*.json ./
 
-# Устанавливаем зависимости включая terser
+# Устанавливаем зависимости
 RUN npm install
-RUN npm install --save-dev terser
 
 # Копируем остальные файлы
 COPY . .
@@ -18,8 +17,11 @@ RUN npm run build
 # Устанавливаем serve для production
 RUN npm install -g serve
 
+# Указываем порт по умолчанию
+ENV PORT=3000
+
 # Expose port
 EXPOSE 3000
 
-# Запускаем приложение
-CMD serve -s dist -l $PORT
+# Запускаем приложение с портом по умолчанию
+CMD serve -s dist -l ${PORT:-3000}
