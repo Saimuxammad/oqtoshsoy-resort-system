@@ -5,8 +5,9 @@ WORKDIR /app
 # Копируем package files
 COPY package*.json ./
 
-# Устанавливаем зависимости включая dev dependencies
+# Устанавливаем зависимости включая terser
 RUN npm install
+RUN npm install --save-dev terser
 
 # Копируем остальные файлы
 COPY . .
