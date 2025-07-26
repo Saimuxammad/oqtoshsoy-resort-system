@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+nixPkgs = ["nodejs-18_x"]
+
+[build.buildCommand]
+cmd = "npm install && npm run build"
+
+[deploy]
+startCommand = "npx serve dist -l $PORT"

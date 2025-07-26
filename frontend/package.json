@@ -21,6 +21,7 @@
     "@heroicons/react": "^2.0.18",
     "clsx": "^2.0.0",
     "react-hot-toast": "^2.4.1",
+    "serve": "^14.2.1",
     "chart.js": "^4.4.1",
     "react-chartjs-2": "^5.2.0"
   },
