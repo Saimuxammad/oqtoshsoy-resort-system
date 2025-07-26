@@ -1,4 +1,10 @@
-useEffect(() => {
+import { useEffect, useState } from 'react';
+
+export function useTelegram() {
+  const [webApp, setWebApp] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
     const tg = window.Telegram?.WebApp;
     
     if (tg) {
@@ -30,4 +36,38 @@ useEffect(() => {
         username: 'testuser'
       });
     }
-}, []);
+  }, []);
+
+  const close = () => {
+    webApp?.close?.();
+  };
+
+  const showAlert = (message) => {
+    if (webApp?.showAlert) {
+      webApp.showAlert(message);
+    } else {
+      alert(message);
+    }
+  };
+
+  const showConfirm = (message) => {
+    return new Promise((resolve) => {
+      if (webApp?.showConfirm) {
+        webApp.showConfirm(message, (confirmed) => {
+          resolve(confirmed);
+        });
+      } else {
+        resolve(confirm(message));
+      }
+    });
+  };
+
+  return {
+    webApp,
+    user,
+    close,
+    showAlert,
+    showConfirm,
+    isReady: !!webApp || !!user
+  };
+}
