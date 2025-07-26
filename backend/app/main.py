@@ -59,7 +59,11 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://oqtoshsoy-resort-system-production.up.railway.app"],
+    allow_origins=[
+        "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
+        "http://localhost:5173",
+        "http://localhost:5174"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
