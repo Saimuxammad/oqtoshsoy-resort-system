@@ -24,11 +24,14 @@ class NotificationService:
         # Get all admin users
         admins = db.query(User).filter(User.is_admin == True).all()
 
+        # Исправлено: вынесли строку с апострофом в переменную
+        no_guest = "Ko'rsatilmagan"
+
         message = (
             "🆕 <b>Yangi bron yaratildi</b>\n\n"
             f"🏨 Xona: №{room.room_number} ({room.room_type})\n"
             f"📅 Sanalar: {booking.start_date.strftime('%d.%m.%Y')} - {booking.end_date.strftime('%d.%m.%Y')}\n"
-            f"👤 Mehmon: {booking.guest_name or 'Ko\'rsatilmagan'}\n"
+            f"👤 Mehmon: {booking.guest_name or no_guest}\n"
             f"✍️ Yaratuvchi: {created_by.first_name} {created_by.last_name or ''}\n"
             f"🕐 Vaqt: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
         )
@@ -58,11 +61,14 @@ class NotificationService:
         """Send notification when booking is cancelled"""
         admins = db.query(User).filter(User.is_admin == True).all()
 
+        # Исправлено: вынесли строку с апострофом в переменную
+        no_guest = "Ko'rsatilmagan"
+
         message = (
             "❌ <b>Bron bekor qilindi</b>\n\n"
             f"🏨 Xona: №{room.room_number} ({room.room_type})\n"
             f"📅 Sanalar: {booking.start_date.strftime('%d.%m.%Y')} - {booking.end_date.strftime('%d.%m.%Y')}\n"
-            f"👤 Mehmon: {booking.guest_name or 'Ko\'rsatilmagan'}\n"
+            f"👤 Mehmon: {booking.guest_name or no_guest}\n"
             f"🚫 Bekor qiluvchi: {cancelled_by.first_name} {cancelled_by.last_name or ''}\n"
             f"🕐 Vaqt: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
         )
@@ -92,6 +98,9 @@ class NotificationService:
         occupied_rooms = len(bookings)
         occupancy_rate = (occupied_rooms / total_rooms * 100) if total_rooms > 0 else 0
 
+        # Исправлено: вынесли строку с апострофом в переменную
+        rooms_list_text = "Band xonalar ro'yxati:"
+
         message = (
             "📊 <b>Kunlik hisobot</b>\n\n"
             f"📅 Sana: {today.strftime('%d.%m.%Y')}\n"
@@ -102,18 +111,22 @@ class NotificationService:
         )
 
         if bookings:
-            message += "<b>Band xonalar ro'yxati:</b>\n"
+            message += f"<b>{rooms_list_text}</b>\n"
             for booking in bookings[:10]:  # Show first 10
                 room = booking.room
-                message += f"• №{room.room_number} - {booking.guest_name or 'Mehmon'}\n"
+                guest_name = booking.guest_name or 'Mehmon'
+                message += f"• №{room.room_number} - {guest_name}\n"
 
             if len(bookings) > 10:
                 message += f"\n<i>Va yana {len(bookings) - 10} ta xona...</i>"
 
         admins = db.query(User).filter(User.is_admin == True).all()
 
+        # Исправлено: вынесли текст кнопки в переменную
+        button_text = "📱 Batafsil ko'rish"
+
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📱 Batafsil ko'rish", web_app={"url": settings.web_app_url})]
+            [InlineKeyboardButton(text=button_text, web_app={"url": settings.web_app_url})]
         ])
 
         for admin in admins:
@@ -129,4 +142,3 @@ class NotificationService:
 
 
 notification_service = NotificationService()
-
