@@ -16,12 +16,12 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
     () => roomService.getRooms(filters),
     {
       onError: (error) => {
-        console.error('Room fetch error:', error);
+        console.error('❌ Xatolik:', error);
         toast.error(`Xonalarni yuklashda xatolik: ${error.message}`);
       },
       onSuccess: (data) => {
-        console.log('Rooms loaded successfully:', data);
-      }
+        console.log('✅ Xonalar yuklandi:', data);
+      },
     }
   );
 
@@ -30,9 +30,9 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
     toast.success('Yangilandi');
   };
 
-  // Group rooms by type
+  // Группировка по типу
   const groupedRooms = rooms?.reduce((acc, room) => {
-    const type = room.room_type;
+    const type = room.room_type || 'Boshqa';
     if (!acc[type]) acc[type] = [];
     acc[type].push(room);
     return acc;
@@ -53,28 +53,28 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
     );
   }
 
-  // Debug info
-  console.log('Rooms data:', rooms);
-  console.log('Grouped rooms:', groupedRooms);
-
   return (
     <div className="flex flex-col lg:flex-row gap-6">
-      {/* Filters - Sidebar on desktop, top on mobile */}
+      {/* Filtrlash paneli */}
       <div className="lg:w-64 flex-shrink-0">
         <RoomFilter filters={filters} onChange={setFilters} />
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-4 w-full"
+          onClick={() => setFilters({})}
+        >
+          Filtrni tozalash
+        </Button>
       </div>
 
-      {/* Room List */}
+      {/* Xonalar ro'yxati */}
       <div className="flex-1">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
             Xonalar ro'yxati {rooms && `(${rooms.length})`}
           </h2>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleRefresh}
-          >
+          <Button variant="secondary" size="sm" onClick={handleRefresh}>
             <ArrowPathIcon className="h-4 w-4 mr-2" />
             Qayta yuklash
           </Button>
