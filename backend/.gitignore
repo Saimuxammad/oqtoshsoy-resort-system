@@ -1,0 +1,14 @@
+# .gitignore для Python-бэкенда
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+build/
+dist/
+*.sqlite3
+*.log
+.idea/
+.vscode/
+.DS_Store
