@@ -61,9 +61,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
+        "https://oqtoshsoy-resort-system-production.up.railway.app",
         "http://localhost:5173",
-        "http://localhost:5174"
-        "*"  # Временно для тестирования
+        "http://localhost:5174",
+        "http://localhost:3000",
+        "*"  # Временно для отладки
     ],
     allow_credentials=True,
     allow_methods=["*"],
