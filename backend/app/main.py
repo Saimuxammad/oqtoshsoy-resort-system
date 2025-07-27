@@ -53,17 +53,23 @@ app = FastAPI(
     title="Oqtoshsoy Resort Management API",
     version="2.0.0",
     description="Advanced hotel management system with real-time updates",
-    lifespan=lifespan
+    lifespan=lifespan,
+    # ВАЖНО: Отключаем автоматическое добавление слешей
+    redirect_slashes=False
 )
 
-# Configure CORS - ВАЖНО: это должно быть ДО включения роутеров
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://oqtoshsoy-resort-system-production-ef7c.up.railway.app"],  # В production замените на конкретные домены
+    allow_origins=[
+        "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "*"  # Временно для тестирования
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
 
 # Include routers
