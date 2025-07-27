@@ -63,7 +63,7 @@ app.add_middleware(
         "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
         "http://localhost:5173",
         "http://localhost:5174"
-            "*"  # Временно для тестирования
+        "*"  # Временно для тестирования
     ],
     allow_credentials=True,
     allow_methods=["*"],

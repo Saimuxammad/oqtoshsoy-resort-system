@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Определяем URL в зависимости от окружения
+// ВАЖНО: Используем HTTPS для production!
 const API_BASE_URL = import.meta.env.PROD
   ? 'https://oqtoshsoy-resort-system-production.up.railway.app/api'
   : 'http://localhost:8000/api';
@@ -13,6 +13,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Добавляем timeout
+  timeout: 30000,
 });
 
 // Add auth token to requests
@@ -22,6 +24,7 @@ api.interceptors.request.use((config) => {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
   console.log('API Request:', config.method?.toUpperCase(), config.url);
+  console.log('Request headers:', config.headers);
   return config;
 });
 
@@ -32,18 +35,26 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error('API Error:', {
+    console.error('API Error Details:', {
       url: error.config?.url,
+      method: error.config?.method,
       status: error.response?.status,
+      statusText: error.response?.statusText,
       data: error.response?.data,
-      message: error.message
+      message: error.message,
+      code: error.code
     });
+
+    // Специальная обработка для Network Error
+    if (error.code === 'ERR_NETWORK') {
+      console.error('Network Error - возможно проблема с CORS или недоступен сервер');
+    }
 
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
-      // В development режиме не перезагружаем страницу
-      if (import.meta.env.PROD) {
-        window.location.reload();
+      // Не перезагружаем в dev режиме
+      if (import.meta.env.PROD && window.location.pathname !== '/login') {
+        // window.location.href = '/login';
       }
     }
 
