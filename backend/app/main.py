@@ -59,7 +59,7 @@ app = FastAPI(
 # Configure CORS - ВАЖНО: это должно быть ДО включения роутеров
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://oqtoshsoy-resort-system-production-ef7c.up.railway.app"],  # В production замените на конкретные домены
+    allow_origins=["https://oqtoshsoy-resort-system-production-ef7c.up.railway.app"],  # В production замените на конкретные домены
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Используем переменную окружения или дефолтный HTTPS URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://oqtoshsoy-resort-system-production.up.railway.app/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
 
 console.log('Environment:', import.meta.env.MODE);
 console.log('API_BASE_URL:', API_BASE_URL);
