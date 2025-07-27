@@ -1,7 +1,7 @@
 import api from './api';
 
 export const roomService = {
-  // Get all rooms - ВАЖНО: добавляем слеш в конце!
+  // Get all rooms
   getRooms: async (filters = {}) => {
     console.log('Fetching rooms from:', api.defaults.baseURL);
     const params = new URLSearchParams();
@@ -9,7 +9,7 @@ export const roomService = {
     if (filters.isAvailable !== undefined) params.append('is_available', filters.isAvailable);
 
     try {
-      // ВАЖНО: /rooms/ с слешем в конце!
+      // ВАЖНО: Добавляем слеш после rooms
       const response = await api.get(`/rooms/?${params}`);
       console.log('Rooms response:', response.data);
       return response.data;
