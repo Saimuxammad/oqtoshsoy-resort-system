@@ -14,7 +14,6 @@ import { Loading } from './components/UI/Loading';
 import { useTelegram } from './hooks/useTelegram';
 import { useWebSocket } from './hooks/useWebSocket';
 import { authService } from './services/authService';
-import { RoomList } from './components/RoomList/RoomList';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,34 +43,44 @@ function AppContent() {
 
   useEffect(() => {
     console.log('App starting...');
-    console.log('Environment:', import.meta.env.MODE);
-    console.log('API URL:', import.meta.env.VITE_API_URL);
+    console.log('import.meta.env.DEV:', import.meta.env.DEV);
     console.log('Telegram WebApp:', window.Telegram?.WebApp);
     console.log('User:', user);
     console.log('isReady:', isReady);
 
-    const initializeAuth = async () => {
-      try {
-        // Всегда пытаемся аутентифицироваться
-        const authData = await authService.authenticate(
-          window.Telegram?.WebApp?.initData || ''
-        );
-
-        console.log('Auth success:', authData);
-        setIsAuthenticated(true);
-        setAuthToken(authData.access_token || 'dev_token');
-      } catch (error) {
-        console.error('Authentication failed:', error);
-        // В случае ошибки все равно показываем интерфейс для тестирования
+    // Для production Railway или dev режима
+    if (import.meta.env.DEV || !window.Telegram?.WebApp) {
+      console.log('Dev mode or no Telegram - auto authenticate');
+      setIsAuthenticated(true);
+      setAuthToken('dev_token');
+      setIsLoading(false);
+    } else if (isReady && user) {
+      console.log('Telegram mode - authenticating...');
+      authService.authenticate(window.Telegram.WebApp.initData)
+        .then((data) => {
+          console.log('Auth success:', data);
+          setIsAuthenticated(true);
+          setAuthToken(data.token || 'dev_token');
+        })
+        .catch((error) => {
+          console.error('Authentication failed:', error);
+          // В production тоже разрешаем для тестирования
+          setIsAuthenticated(true);
+          setAuthToken('dev_token');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      // Если ничего не сработало - все равно показываем интерфейс
+      setTimeout(() => {
+        console.log('Timeout - auto authenticate');
         setIsAuthenticated(true);
         setAuthToken('dev_token');
-      } finally {
         setIsLoading(false);
-      }
-    };
-
-    initializeAuth();
-  }, []);
+      }, 1000);
+    }
+  }, [isReady, user]);
 
   const handleEditRoom = (room) => {
     setSelectedRoom(room);
@@ -115,33 +124,29 @@ function AppContent() {
       <Navigation activeTab={activeTab} onChange={setActiveTab} />
 
       <main className="container mx-auto px-4 py-6">
-  {activeTab === 'rooms' && (
-    <RoomList
-      onEditRoom={handleEditRoom}
-      onViewCalendar={handleViewCalendar}
-    />
-  )}
+        {activeTab === 'rooms' && (
+          <RoomList
+            onEditRoom={handleEditRoom}
+            onViewCalendar={handleViewCalendar}
+          />
+        )}
 
-  {activeTab === 'bookings' && (
-    <RoomList />
-  )}
+        {activeTab === 'calendar' && (
+          <CalendarView selectedRoom={selectedRoom} />
+        )}
 
-  {activeTab === 'calendar' && (
-    <CalendarView selectedRoom={selectedRoom} />
-  )}
+        {activeTab === 'analytics' && (
+          <AnalyticsDashboard />
+        )}
 
-  {activeTab === 'analytics' && (
-    <AnalyticsDashboard />
-  )}
+        {activeTab === 'history' && (
+          <HistoryLog />
+        )}
 
-  {activeTab === 'history' && (
-    <HistoryLog />
-  )}
-
-  {activeTab === 'settings' && (
-    <SettingsPanel />
-  )}
-</main>
+        {activeTab === 'settings' && (
+          <SettingsPanel />
+        )}
+      </main>
 
       <BookingModal
         isOpen={isBookingModalOpen}
