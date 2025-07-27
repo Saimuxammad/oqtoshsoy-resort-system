@@ -1,11 +1,14 @@
 import axios from 'axios';
 
-// Используем переменную окружения или дефолтный HTTPS URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
+// ⛳ Устанавливаем HTTPS базовый URL, если в продакшене
+const API_BASE_URL = import.meta.env.MODE === 'production'
+  ? 'https://oqtoshsoy-resort-system-production.up.railway.app/api'
+  : (import.meta.env.VITE_API_URL || 'http://localhost:8000/api');
 
-console.log('Environment:', import.meta.env.MODE);
-console.log('API_BASE_URL:', API_BASE_URL);
+console.log('🌍 Среда:', import.meta.env.MODE);
+console.log('🔗 Базовый URL:', API_BASE_URL);
 
+// ⚙️ Создаём экземпляр axios
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -13,35 +16,34 @@ const api = axios.create({
   },
 });
 
-// Add auth token to requests
+// 🔐 Авторизация: добавляем токен к каждому запросу
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
-  console.log('API Request:', config.method?.toUpperCase(), config.url);
+  console.log('📡 Запрос:', config.method?.toUpperCase(), config.url);
   return config;
 });
 
-// Handle responses and errors
+// 📥 Обработка ответов и ошибок
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response:', response.config.url, response.status);
-    console.log('Response data:', response.data);
+    console.log('✅ Ответ:', response.config.url, response.status);
     return response;
   },
   (error) => {
-    console.error('API Error:', {
+    console.error('❌ Ошибка API:', {
       url: error.config?.url,
       status: error.response?.status,
       data: error.response?.data,
       message: error.message
     });
 
+    // 🔁 Обработка 401: сброс токена и перезагрузка
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
-      // В production режиме перезагружаем страницу
-      if (import.meta.env.PROD) {
+      if (import.meta.env.MODE === 'production') {
         window.location.reload();
       }
     }
