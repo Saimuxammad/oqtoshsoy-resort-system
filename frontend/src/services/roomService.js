@@ -9,8 +9,7 @@ export const roomService = {
     if (filters.isAvailable !== undefined) params.append('is_available', filters.isAvailable);
 
     try {
-      // ВАЖНО: Добавляем слеш после rooms
-      const response = await api.get(`/rooms/?${params}`);
+      const response = await api.get(`/rooms?${params}`);
       console.log('Rooms response:', response.data);
       return response.data;
     } catch (error) {
@@ -21,7 +20,7 @@ export const roomService = {
 
   // Get single room
   getRoom: async (roomId) => {
-    const response = await api.get(`/rooms/${roomId}/`);
+    const response = await api.get(`/rooms/${roomId}`);
     return response.data;
   },
 
@@ -31,13 +30,13 @@ export const roomService = {
       start_date: startDate,
       end_date: endDate
     });
-    const response = await api.get(`/rooms/${roomId}/availability/?${params}`);
+    const response = await api.get(`/rooms/${roomId}/availability?${params}`);
     return response.data;
   },
 
   // Update room
   updateRoom: async (roomId, data) => {
-    const response = await api.patch(`/rooms/${roomId}/`, data);
+    const response = await api.patch(`/rooms/${roomId}`, data);
     return response.data;
   }
 };
