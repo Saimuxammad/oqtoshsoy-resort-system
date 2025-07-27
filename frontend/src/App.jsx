@@ -13,117 +13,157 @@ import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { Loading } from './components/UI/Loading';
 import { useTelegram } from './hooks/useTelegram';
 import { useWebSocket } from './hooks/useWebSocket';
-import { authService } from './services/authService';  // Исправлен путь
+import { authService } from './services/authService';
 
-export function RoomList({ onEditRoom, onViewCalendar }) {
-  const [filters, setFilters] = useState({});
-
-  const { data: rooms, isLoading, error, refetch } = useQuery(
-    ['rooms', filters],
-    async () => {
-      if (!roomService || typeof roomService.getRooms !== 'function') {
-        console.error('roomService.getRooms is not a function', roomService);
-        throw new Error('roomService.getRooms is not properly defined');
-      }
-      return await roomService.getRooms(filters);
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
     },
-    {
-      onError: (error) => {
-        console.error('Room fetch error:', error);
-        toast.error(`Xonalarni yuklashda xatolik: ${error.message}`);
-      },
-      onSuccess: (data) => {
-        console.log('Rooms loaded successfully:', data);
-      }
-    }
-  );
+  },
+});
 
-  const handleRefresh = () => {
-    refetch();
-    toast.success('Yangilandi');
+function AppContent() {
+  const [activeTab, setActiveTab] = useState('rooms');
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+
+  const { user, isReady } = useTelegram();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authToken, setAuthToken] = useState(null);
+
+  // WebSocket connection - закомментируем пока
+  // useWebSocket(
+  //   `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/ws'}`,
+  //   authToken
+  // );
+
+  useEffect(() => {
+    console.log('App starting...');
+    console.log('Environment:', import.meta.env.MODE);
+    console.log('API URL:', import.meta.env.VITE_API_URL);
+    console.log('Telegram WebApp:', window.Telegram?.WebApp);
+    console.log('User:', user);
+    console.log('isReady:', isReady);
+
+    const initializeAuth = async () => {
+      try {
+        // Всегда пытаемся аутентифицироваться
+        const authData = await authService.authenticate(
+          window.Telegram?.WebApp?.initData || ''
+        );
+
+        console.log('Auth success:', authData);
+        setIsAuthenticated(true);
+        setAuthToken(authData.access_token || 'dev_token');
+      } catch (error) {
+        console.error('Authentication failed:', error);
+        // В случае ошибки все равно показываем интерфейс для тестирования
+        setIsAuthenticated(true);
+        setAuthToken('dev_token');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  const handleEditRoom = (room) => {
+    setSelectedRoom(room);
+    setSelectedBooking(room.current_booking);
+    setIsBookingModalOpen(true);
   };
 
-  // Group rooms by type
-  const groupedRooms = rooms?.reduce((acc, room) => {
-    const type = room.room_type;
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(room);
-    return acc;
-  }, {}) || {};
+  const handleViewCalendar = (room) => {
+    setSelectedRoom(room);
+    setActiveTab('calendar');
+  };
 
-  if (isLoading) return <Loading />;
+  const handleCloseModal = () => {
+    setIsBookingModalOpen(false);
+    setSelectedRoom(null);
+    setSelectedBooking(null);
+  };
 
-  if (error) {
+  if (isLoading) {
+    return <Loading text="Tizimga ulanmoqda..." />;
+  }
+
+  if (!isAuthenticated) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600 mb-4">Xatolik yuz berdi</p>
-        <p className="text-gray-600 mb-4">{error.message}</p>
-        <Button onClick={handleRefresh} variant="secondary">
-          <ArrowPathIcon className="h-4 w-4 mr-2" />
-          Qayta urinish
-        </Button>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Ruxsat berilmagan
+          </h2>
+          <p className="text-gray-600">
+            Iltimos, Telegram orqali kiring
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Debug info
-  console.log('Rooms data:', rooms);
-  console.log('Grouped rooms:', groupedRooms);
-
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
-      {/* Filters - Sidebar on desktop, top on mobile */}
-      <div className="lg:w-64 flex-shrink-0">
-        <RoomFilter filters={filters} onChange={setFilters} />
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <Navigation activeTab={activeTab} onChange={setActiveTab} />
 
-      {/* Room List */}
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Xonalar ro'yxati {rooms && `(${rooms.length})`}
-          </h2>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleRefresh}
-          >
-            <ArrowPathIcon className="h-4 w-4 mr-2" />
-            Qayta yuklash
-          </Button>
-        </div>
-
-        {!rooms || rooms.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Xonalar topilmadi</p>
-            <p className="text-sm mt-2">Backend serverini tekshiring</p>
-          </div>
-        ) : Object.keys(groupedRooms).length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Filtrlangan xonalar topilmadi</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedRooms).map(([type, typeRooms]) => (
-              <div key={type}>
-                <h3 className="text-lg font-medium text-gray-800 mb-3">
-                  {type} ({typeRooms.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {typeRooms.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onEdit={onEditRoom}
-                      onViewCalendar={onViewCalendar}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+      <main className="container mx-auto px-4 py-6">
+        {activeTab === 'rooms' && (
+          <RoomList
+            onEditRoom={handleEditRoom}
+            onViewCalendar={handleViewCalendar}
+          />
         )}
-      </div>
+
+        {activeTab === 'calendar' && (
+          <CalendarView selectedRoom={selectedRoom} />
+        )}
+
+        {activeTab === 'analytics' && (
+          <AnalyticsDashboard />
+        )}
+
+        {activeTab === 'history' && (
+          <HistoryLog />
+        )}
+
+        {activeTab === 'settings' && (
+          <SettingsPanel />
+        )}
+      </main>
+
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={handleCloseModal}
+        room={selectedRoom}
+        booking={selectedBooking}
+      />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppContent />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+          }}
+        />
+      </QueryClientProvider>
+    </LanguageProvider>
   );
 }
