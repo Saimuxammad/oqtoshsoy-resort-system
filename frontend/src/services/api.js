@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// ВРЕМЕННОЕ РЕШЕНИЕ - используем только HTTPS URL
-const API_BASE_URL = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
+// Используем переменную окружения или дефолтный HTTPS URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
 
+console.log('Environment:', import.meta.env.MODE);
 console.log('API_BASE_URL:', API_BASE_URL);
 
 const api = axios.create({
@@ -39,6 +40,10 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
+      // В production режиме перезагружаем страницу
+      if (import.meta.env.PROD) {
+        window.location.reload();
+      }
     }
 
     return Promise.reject(error);
