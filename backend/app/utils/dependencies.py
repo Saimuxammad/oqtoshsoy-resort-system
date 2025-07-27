@@ -29,13 +29,13 @@ async def get_current_user(
 ) -> User:
     # Для development режима без токена
     if settings.environment == "development" and not credentials:
-        user = db.query(User).filter(User.telegram_id == 123456789).first()
+        user = db.query(User).filter(User.telegram_id == 5488749868).first()
         if user:
             return user
 
         # Создаем тестового пользователя
         user = User(
-            telegram_id=123456789,
+            telegram_id=5488749868,
             first_name="Test",
             last_name="User",
             username="testuser",
@@ -91,7 +91,7 @@ async def get_current_user_ws(token: str, db: Session) -> Optional[User]:
     """Get current user for WebSocket connection"""
     # В режиме разработки/тестирования возвращаем тестового пользователя
     if settings.environment == "development":
-        return db.query(User).filter(User.telegram_id == 123456789).first()
+        return db.query(User).filter(User.telegram_id == 5488749868).first()
 
     # В production проверяем токен
     try:

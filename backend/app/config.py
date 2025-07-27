@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     secret_key: str
     redis_url: str = "redis://default:AbPQAAIjcDEzMTRiYzM1NDZhZjQ0MGM4YmQ5NDFlYWRjYTliZjE3OHAxMA@desired-sheepdog-46032.upstash.io:6379"
     environment: str = "development"
-    allowed_telegram_ids: str = ""  # Изменено на str
+    allowed_telegram_ids: str = "5488749868"  # Изменено на str
     web_app_url: str = "http://localhost:5173"  # Добавлено
 
     class Config:

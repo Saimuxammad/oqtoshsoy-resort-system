@@ -18,12 +18,12 @@ db = SessionLocal()
 
 try:
     # Проверяем есть ли тестовый пользователь
-    test_user = db.query(User).filter(User.telegram_id == 123456789).first()
+    test_user = db.query(User).filter(User.telegram_id == 5488749868).first()
 
     if not test_user:
         # Создаем тестового пользователя
         test_user = User(
-            telegram_id=123456789,
+            telegram_id=5488749868,
             first_name="Test",
             last_name="User",
             username="testuser",
