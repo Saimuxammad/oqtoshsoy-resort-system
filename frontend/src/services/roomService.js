@@ -3,12 +3,19 @@ import api from './api';
 export const roomService = {
   // Get all rooms
   getRooms: async (filters = {}) => {
+    console.log('Fetching rooms from:', api.defaults.baseURL);
     const params = new URLSearchParams();
     if (filters.roomType) params.append('room_type', filters.roomType);
     if (filters.isAvailable !== undefined) params.append('is_available', filters.isAvailable);
 
-    const response = await api.get(`/rooms?${params}`);
-    return response.data;
+    try {
+      const response = await api.get(`/rooms?${params}`);
+      console.log('Rooms response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('getRooms error:', error);
+      throw error;
+    }
   },
 
   // Get single room

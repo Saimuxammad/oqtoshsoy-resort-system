@@ -1,8 +1,12 @@
 import axios from 'axios';
-// import { API_BASE_URL } from '../utils/constants';
 
-// Хардкодим URL напрямую
-const API_BASE_URL = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
+// Определяем URL в зависимости от окружения
+const API_BASE_URL = import.meta.env.PROD
+  ? 'https://oqtoshsoy-resort-system-production.up.railway.app/api'
+  : 'http://localhost:8000/api';
+
+console.log('API_BASE_URL:', API_BASE_URL);
+console.log('Environment:', import.meta.env.MODE);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -17,20 +21,30 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
+  console.log('API Request:', config.method?.toUpperCase(), config.url);
   return config;
 });
 
-// Handle errors
+// Handle responses and errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API Response:', response.config.url, response.status);
+    return response;
+  },
   (error) => {
-    console.error('API Error:', error.response?.data || error.message);
+    console.error('API Error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
 
     if (error.response?.status === 401) {
-      // Токен истек, очищаем
       localStorage.removeItem('auth_token');
-      // Не перезагружаем страницу в development
-      // window.location.reload();
+      // В development режиме не перезагружаем страницу
+      if (import.meta.env.PROD) {
+        window.location.reload();
+      }
     }
 
     return Promise.reject(error);
