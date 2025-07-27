@@ -38,5 +38,11 @@ export const roomService = {
   updateRoom: async (roomId, data) => {
     const response = await api.patch(`/rooms/${roomId}`, data);
     return response.data;
+  },
+
+  // Create room (admin only)
+  createRoom: async (data) => {
+    const response = await api.post('/rooms', data);
+    return response.data;
   }
 };

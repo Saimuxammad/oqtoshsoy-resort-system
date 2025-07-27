@@ -1,151 +1,122 @@
-import React, { useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { Toaster } from 'react-hot-toast';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { Header } from './components/Layout/Header';
-import { Navigation } from './components/Layout/Navigation';
-import { RoomList } from './components/RoomList/RoomList';
-import { BookingModal } from './components/BookingModal/BookingModal';
-import { CalendarView } from './components/Calendar/CalendarView';
-import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
-import { HistoryLog } from './components/History/HistoryLog';
-import { SettingsPanel } from './components/Settings/SettingsPanel';
-import { Loading } from './components/UI/Loading';
-import { useTelegram } from './hooks/useTelegram';
-import { authService } from './services/authService';
+import React, { useState } from 'react';
+import { useQuery } from 'react-query';
+import { roomService } from '../../services/roomService';
+import { RoomCard } from './RoomCard';
+import { RoomFilter } from './RoomFilter';
+import { Loading } from '../UI/Loading';
+import { Button } from '../UI/Button';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      // Добавляем стандартную обработку ошибок
-      onError: (error) => {
-        console.error('Query error:', error);
+export function RoomList({ onEditRoom, onViewCalendar }) {
+  const [filters, setFilters] = useState({});
+
+  const { data: rooms, isLoading, error, refetch } = useQuery(
+    ['rooms', filters],
+    async () => {
+      if (!roomService || typeof roomService.getRooms !== 'function') {
+        console.error('roomService.getRooms is not a function', roomService);
+        throw new Error('roomService.getRooms is not properly defined');
       }
+      return await roomService.getRooms(filters);
     },
-  },
-});
-
-function AppContent() {
-  const [activeTab, setActiveTab] = useState('rooms');
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState(null);
-
-  const { user, isReady } = useTelegram();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      console.log('Initializing auth...');
-
-      try {
-        // Проверяем, есть ли уже токен
-        if (authService.isAuthenticated()) {
-          console.log('Already authenticated');
-          setIsAuthenticated(true);
-          setIsLoading(false);
-          return;
-        }
-
-        // Пытаемся авторизоваться
-        const authData = await authService.authenticate(
-          window.Telegram?.WebApp?.initData || ''
-        );
-
-        console.log('Auth successful:', authData);
-        setIsAuthenticated(true);
-      } catch (error) {
-        console.error('Auth failed:', error);
-        // Даже если авторизация не удалась, позволяем использовать приложение
-        setIsAuthenticated(true);
-      } finally {
-        setIsLoading(false);
+    {
+      onError: (error) => {
+        console.error('Room fetch error:', error);
+        toast.error(`Xonalarni yuklashda xatolik: ${error.message}`);
+      },
+      onSuccess: (data) => {
+        console.log('Rooms loaded successfully:', data);
       }
-    };
+    }
+  );
 
-    initAuth();
-  }, []);
-
-  const handleEditRoom = (room) => {
-    setSelectedRoom(room);
-    setSelectedBooking(room.current_booking);
-    setIsBookingModalOpen(true);
+  const handleRefresh = () => {
+    refetch();
+    toast.success('Yangilandi');
   };
 
-  const handleViewCalendar = (room) => {
-    setSelectedRoom(room);
-    setActiveTab('calendar');
-  };
+  // Group rooms by type
+  const groupedRooms = rooms?.reduce((acc, room) => {
+    const type = room.room_type;
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(room);
+    return acc;
+  }, {}) || {};
 
-  const handleCloseModal = () => {
-    setIsBookingModalOpen(false);
-    setSelectedRoom(null);
-    setSelectedBooking(null);
-  };
+  if (isLoading) return <Loading />;
 
-  if (isLoading) {
-    return <Loading text="Tizimga ulanmoqda..." />;
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600 mb-4">Xatolik yuz berdi</p>
+        <p className="text-gray-600 mb-4">{error.message}</p>
+        <Button onClick={handleRefresh} variant="secondary">
+          <ArrowPathIcon className="h-4 w-4 mr-2" />
+          Qayta urinish
+        </Button>
+      </div>
+    );
   }
 
+  // Debug info
+  console.log('Rooms data:', rooms);
+  console.log('Grouped rooms:', groupedRooms);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <Navigation activeTab={activeTab} onChange={setActiveTab} />
+    <div className="flex flex-col lg:flex-row gap-6">
+      {/* Filters - Sidebar on desktop, top on mobile */}
+      <div className="lg:w-64 flex-shrink-0">
+        <RoomFilter filters={filters} onChange={setFilters} />
+      </div>
 
-      <main className="container mx-auto px-4 py-6">
-        {activeTab === 'rooms' && (
-          <RoomList
-            onEditRoom={handleEditRoom}
-            onViewCalendar={handleViewCalendar}
-          />
+      {/* Room List */}
+      <div className="flex-1">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Xonalar ro'yxati {rooms && `(${rooms.length})`}
+          </h2>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRefresh}
+          >
+            <ArrowPathIcon className="h-4 w-4 mr-2" />
+            Qayta yuklash
+          </Button>
+        </div>
+
+        {!rooms || rooms.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>Xonalar topilmadi</p>
+            <p className="text-sm mt-2">Backend serverini tekshiring</p>
+          </div>
+        ) : Object.keys(groupedRooms).length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>Filtrlangan xonalar topilmadi</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(groupedRooms).map(([type, typeRooms]) => (
+              <div key={type}>
+                <h3 className="text-lg font-medium text-gray-800 mb-3">
+                  {type} ({typeRooms.length})
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {typeRooms.map((room) => (
+                    <RoomCard
+                      key={room.id}
+                      room={room}
+                      onEdit={onEditRoom}
+                      onViewCalendar={onViewCalendar}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-
-        {activeTab === 'calendar' && (
-          <CalendarView selectedRoom={selectedRoom} />
-        )}
-
-        {activeTab === 'analytics' && (
-          <AnalyticsDashboard />
-        )}
-
-        {activeTab === 'history' && (
-          <HistoryLog />
-        )}
-
-        {activeTab === 'settings' && (
-          <SettingsPanel />
-        )}
-      </main>
-
-      <BookingModal
-        isOpen={isBookingModalOpen}
-        onClose={handleCloseModal}
-        room={selectedRoom}
-        booking={selectedBooking}
-      />
+      </div>
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <LanguageProvider>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-          }}
-        />
-      </QueryClientProvider>
-    </LanguageProvider>
   );
 }
