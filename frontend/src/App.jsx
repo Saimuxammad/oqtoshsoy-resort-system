@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
-import { useQuery } from 'react-query';
-import { roomService } from '../../services/roomService';
-import { RoomCard } from './RoomCard';
-import { RoomFilter } from './RoomFilter';
-import { Loading } from '../UI/Loading';
-import { Button } from '../UI/Button';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import { Toaster } from 'react-hot-toast';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { Header } from './components/Layout/Header';
+import { Navigation } from './components/Layout/Navigation';
+import { RoomList } from './components/RoomList/RoomList';
+import { BookingModal } from './components/BookingModal/BookingModal';
+import { CalendarView } from './components/Calendar/CalendarView';
+import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
+import { HistoryLog } from './components/History/HistoryLog';
+import { SettingsPanel } from './components/Settings/SettingsPanel';
+import { Loading } from './components/UI/Loading';
+import { useTelegram } from './hooks/useTelegram';
+import { useWebSocket } from './hooks/useWebSocket';
+import { authService } from './services/authService';  // Исправлен путь
 
 export function RoomList({ onEditRoom, onViewCalendar }) {
   const [filters, setFilters] = useState({});
