@@ -14,6 +14,7 @@ import { Loading } from './components/UI/Loading';
 import { useTelegram } from './hooks/useTelegram';
 import { useWebSocket } from './hooks/useWebSocket';
 import { authService } from './services/authService';
+import { RoomList } from './components/RoomList/RoomList';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -114,29 +115,33 @@ function AppContent() {
       <Navigation activeTab={activeTab} onChange={setActiveTab} />
 
       <main className="container mx-auto px-4 py-6">
-        {activeTab === 'rooms' && (
-          <RoomList
-            onEditRoom={handleEditRoom}
-            onViewCalendar={handleViewCalendar}
-          />
-        )}
+  {activeTab === 'rooms' && (
+    <RoomList
+      onEditRoom={handleEditRoom}
+      onViewCalendar={handleViewCalendar}
+    />
+  )}
 
-        {activeTab === 'calendar' && (
-          <CalendarView selectedRoom={selectedRoom} />
-        )}
+  {activeTab === 'bookings' && (
+    <RoomList />
+  )}
 
-        {activeTab === 'analytics' && (
-          <AnalyticsDashboard />
-        )}
+  {activeTab === 'calendar' && (
+    <CalendarView selectedRoom={selectedRoom} />
+  )}
 
-        {activeTab === 'history' && (
-          <HistoryLog />
-        )}
+  {activeTab === 'analytics' && (
+    <AnalyticsDashboard />
+  )}
 
-        {activeTab === 'settings' && (
-          <SettingsPanel />
-        )}
-      </main>
+  {activeTab === 'history' && (
+    <HistoryLog />
+  )}
+
+  {activeTab === 'settings' && (
+    <SettingsPanel />
+  )}
+</main>
 
       <BookingModal
         isOpen={isBookingModalOpen}

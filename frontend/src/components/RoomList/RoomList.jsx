@@ -1,116 +1,93 @@
 import React, { useState } from 'react';
-import { useQuery } from 'react-query';
-import { roomService } from '../../services/roomService';
-import { RoomCard } from './RoomCard';
-import { RoomFilter } from './RoomFilter';
-import { Loading } from '../UI/Loading';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { bookingService } from '../../services/bookingService';
+import { Card, CardHeader, CardContent } from '../UI/Card';
 import { Button } from '../UI/Button';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { Loading } from '../UI/Loading';
+import { format } from 'date-fns';
+import { uz } from 'date-fns/locale';
+import { TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
-export function RoomList({ onEditRoom, onViewCalendar }) {
+export function BookingsList() {
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState({});
 
-  const { data: rooms, isLoading, error, refetch } = useQuery(
-    ['rooms', filters],
-    () => roomService.getRooms(filters),
+  const { data: bookings, isLoading } = useQuery(
+    ['bookings', filters],
+    () => bookingService.getBookings(filters)
+  );
+
+  const deleteMutation = useMutation(
+    (bookingId) => bookingService.deleteBooking(bookingId),
     {
-      onError: (error) => {
-        console.error('❌ Xatolik:', error);
-        toast.error(`Xonalarni yuklashda xatolik: ${error.message}`);
-      },
-      onSuccess: (data) => {
-        console.log('✅ Xonalar yuklandi:', data);
-      },
+      onSuccess: () => {
+        queryClient.invalidateQueries('bookings');
+        queryClient.invalidateQueries('rooms');
+        toast.success('Bron o\'chirildi');
+      }
     }
   );
 
-  const handleRefresh = () => {
-    refetch();
-    toast.success('Yangilandi');
+  const handleDelete = (bookingId) => {
+    if (window.confirm('Bronni o\'chirmoqchimisiz?')) {
+      deleteMutation.mutate(bookingId);
+    }
   };
-
-  // Группировка по типу
-  const groupedRooms = rooms?.reduce((acc, room) => {
-    const type = room.room_type || 'Boshqa';
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(room);
-    return acc;
-  }, {}) || {};
 
   if (isLoading) return <Loading />;
 
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-600 mb-4">Xatolik yuz berdi</p>
-        <p className="text-gray-600 mb-4">{error.message}</p>
-        <Button onClick={handleRefresh} variant="secondary">
-          <ArrowPathIcon className="h-4 w-4 mr-2" />
-          Qayta urinish
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
-      {/* Filtrlash paneli */}
-      <div className="lg:w-64 flex-shrink-0">
-        <RoomFilter filters={filters} onChange={setFilters} />
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-4 w-full"
-          onClick={() => setFilters({})}
-        >
-          Filtrni tozalash
-        </Button>
-      </div>
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold">Barcha bronlar</h2>
 
-      {/* Xonalar ro'yxati */}
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Xonalar ro'yxati {rooms && `(${rooms.length})`}
-          </h2>
-          <Button variant="secondary" size="sm" onClick={handleRefresh}>
-            <ArrowPathIcon className="h-4 w-4 mr-2" />
-            Qayta yuklash
-          </Button>
-        </div>
+      {bookings && bookings.length > 0 ? (
+        <div className="grid gap-4">
+          {bookings.map((booking) => (
+            <Card key={booking.id}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">
+                      Xona №{booking.room?.room_number || booking.room_id}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {booking.guest_name || 'Mehmon nomi ko\'rsatilmagan'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(booking.start_date), 'dd.MM.yyyy')} -
+                      {format(new Date(booking.end_date), 'dd.MM.yyyy')}
+                    </p>
+                    {booking.notes && (
+                      <p className="text-sm text-gray-500 mt-1">{booking.notes}</p>
+                    )}
+                  </div>
 
-        {!rooms || rooms.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Xonalar topilmadi</p>
-            <p className="text-sm mt-2">Backend serverini tekshiring</p>
-          </div>
-        ) : Object.keys(groupedRooms).length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Filtrlangan xonalar topilmadi</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedRooms).map(([type, typeRooms]) => (
-              <div key={type}>
-                <h3 className="text-lg font-medium text-gray-800 mb-3">
-                  {type} ({typeRooms.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {typeRooms.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onEdit={onEditRoom}
-                      onViewCalendar={onViewCalendar}
-                    />
-                  ))}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => console.log('Edit booking', booking.id)}
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDelete(booking.id)}
+                      loading={deleteMutation.isLoading}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <p className="text-center text-gray-500 py-8">Bronlar topilmadi</p>
+      )}
     </div>
   );
 }
