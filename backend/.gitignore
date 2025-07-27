@@ -1,10 +1,14 @@
-# .gitignore для Node.js-бэкенда
+# .gitignore для Python-бэкенда
 .env
-node_modules/
-*.log
-dist/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
 build/
-coverage/
-.vscode/
+dist/
+*.sqlite3
+*.log
 .idea/
+.vscode/
 .DS_Store
