@@ -12,7 +12,7 @@ export function CalendarView({ selectedRoom }) {
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 }); // Start from Monday
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
   const { data: bookings = [] } = useQuery(
@@ -70,7 +70,7 @@ export function CalendarView({ selectedRoom }) {
           </Button>
 
           <span className="px-3 font-medium text-gray-900">
-            {format(currentDate, 'LLLL yyyy', { locale: uz })}
+            {format(currentDate, 'MMMM yyyy', { locale: uz })}
           </span>
 
           <Button
@@ -93,23 +93,25 @@ export function CalendarView({ selectedRoom }) {
         {days.map((day, idx) => {
           const booked = isBooked(day);
           const today = isToday(day);
-          const currentMonth = isSameMonth(day, currentDate);
+          const isCurrentMonth = isSameMonth(day, currentDate);
 
           return (
             <div
               key={idx}
               className={clsx(
-                'aspect-square flex items-center justify-center text-sm rounded-lg',
+                'aspect-square flex items-center justify-center text-sm rounded-lg relative',
                 {
-                  'bg-red-100 text-red-800 font-medium': booked && currentMonth,
-                  'bg-blue-100 text-blue-800 font-semibold': today,
-                  'hover:bg-gray-100': !booked && !today && currentMonth,
-                  'text-gray-400': !currentMonth,
-                  'text-gray-700': currentMonth && !booked && !today
+                  'bg-red-100': booked,
+                  'bg-primary-100': today && !booked,
+                  'hover:bg-gray-100': !booked && !today && isCurrentMonth,
+                  'text-gray-400': !isCurrentMonth,
+                  'text-gray-900': isCurrentMonth && !booked,
+                  'text-red-800 font-medium': booked,
+                  'text-primary-800 font-semibold': today && !booked,
                 }
               )}
             >
-              {format(day, 'd')}
+              <span>{format(day, 'd')}</span>
             </div>
           );
         })}
@@ -121,7 +123,7 @@ export function CalendarView({ selectedRoom }) {
           <span className="text-gray-600">Band kunlar</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <div className="w-4 h-4 bg-blue-100 rounded"></div>
+          <div className="w-4 h-4 bg-primary-100 rounded"></div>
           <span className="text-gray-600">Bugun</span>
         </div>
       </div>

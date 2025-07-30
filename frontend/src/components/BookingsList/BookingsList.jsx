@@ -29,7 +29,7 @@ export function BookingsList() {
       onSuccess: () => {
         queryClient.invalidateQueries('bookings');
         queryClient.invalidateQueries('rooms');
-        toast.success('Bron o\'chirildi');
+        toast.success('Bron bekor qilindi');
       },
       onError: (error) => {
         toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
@@ -38,7 +38,7 @@ export function BookingsList() {
   );
 
   const handleDelete = (bookingId) => {
-    if (window.confirm('Bronni o\'chirishni tasdiqlaysizmi?')) {
+    if (window.confirm('Bronni bekor qilishni tasdiqlaysizmi?')) {
       deleteMutation.mutate(bookingId);
     }
   };
@@ -111,6 +111,7 @@ export function BookingsList() {
                     variant="danger"
                     size="sm"
                     onClick={() => handleDelete(booking.id)}
+                    title="Bronni bekor qilish"
                     loading={deleteMutation.isLoading}
                   >
                     <TrashIcon className="h-4 w-4" />
