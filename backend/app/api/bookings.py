@@ -158,12 +158,16 @@ async def update_booking(
 async def delete_booking(
         booking_id: int,
         db: Session = Depends(get_db),
-        current_user=Depends(require_admin)
+        current_user=Depends(get_current_user)  # Изменено с require_admin
 ):
-    """Delete booking (admin only)"""
+    """Delete booking (admin or creator only)"""
     booking = BookingService.get_booking(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
+
+    # Check if user can delete (admin or creator)
+    if not current_user.is_admin and booking.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this booking")
 
     room = booking.room
 
