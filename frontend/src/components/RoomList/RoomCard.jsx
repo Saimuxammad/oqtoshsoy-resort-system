@@ -5,20 +5,30 @@ import { RoomStatusBadge } from './RoomStatusBadge';
 import { CalendarDaysIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQueryClient } from 'react-query';
 import { bookingService } from '../../services/bookingService';
+import { useTelegram } from '../../hooks/useTelegram';
 import toast from 'react-hot-toast';
 
 export function RoomCard({ room, onEdit, onViewCalendar }) {
   const queryClient = useQueryClient();
+  const { user } = useTelegram();
 
   const cancelBookingMutation = useMutation(
     (bookingId) => bookingService.deleteBooking(bookingId),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('rooms');
+        queryClient.invalidateQueries('bookings');
         toast.success('Bron bekor qilindi');
       },
       onError: (error) => {
-        toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
+        console.error('Cancel booking error:', error);
+        if (error.response?.status === 403) {
+          toast.error('Bronni bekor qilish uchun admin huquqi kerak');
+        } else if (error.response?.status === 404) {
+          toast.error('Bron topilmadi');
+        } else {
+          toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
+        }
       }
     }
   );
@@ -30,6 +40,9 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
       }
     }
   };
+
+  // Admin yoki o'zi yaratgan bronni bekor qilish mumkin
+  const canCancelBooking = room.current_booking && user;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -58,7 +71,7 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
           </div>
 
           <div className="flex gap-2">
-            {room.current_booking && (
+            {canCancelBooking && (
               <Button
                 variant="danger"
                 size="sm"
@@ -81,7 +94,7 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
               variant="ghost"
               size="sm"
               onClick={() => onEdit(room)}
-              title="Tahrirlash"
+              title={room.is_available ? "Bron qilish" : "Tahrirlash"}
             >
               <PencilIcon className="h-4 w-4" />
             </Button>

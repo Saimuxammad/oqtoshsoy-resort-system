@@ -28,11 +28,21 @@ class BookingUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class RoomInfo(BaseModel):
+    id: int
+    room_number: str
+    room_type: str
+
+    class Config:
+        from_attributes = True
+
+
 class Booking(BookingBase):
     id: int
     created_by: int
     created_at: datetime
     updated_at: datetime
+    room: Optional[RoomInfo] = None
 
     class Config:
         from_attributes = True
