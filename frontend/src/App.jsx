@@ -5,6 +5,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { Header } from './components/Layout/Header';
 import { Navigation } from './components/Layout/Navigation';
 import { RoomList } from './components/RoomList/RoomList';
+import { BookingsList } from './components/BookingsList/BookingsList';
 import { BookingModal } from './components/BookingModal/BookingModal';
 import { CalendarView } from './components/Calendar/CalendarView';
 import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
@@ -12,7 +13,6 @@ import { HistoryLog } from './components/History/HistoryLog';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { Loading } from './components/UI/Loading';
 import { useTelegram } from './hooks/useTelegram';
-import { useWebSocket } from './hooks/useWebSocket';
 import { authService } from './services/authService';
 
 const queryClient = new QueryClient({
@@ -34,12 +34,6 @@ function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [authToken, setAuthToken] = useState(null);
-
-  // WebSocket connection - закомментируем пока
-  // useWebSocket(
-  //   `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/ws'}`,
-  //   authToken
-  // );
 
   useEffect(() => {
     console.log('App starting...');
@@ -129,6 +123,10 @@ function AppContent() {
             onEditRoom={handleEditRoom}
             onViewCalendar={handleViewCalendar}
           />
+        )}
+
+        {activeTab === 'bookings' && (
+          <BookingsList />
         )}
 
         {activeTab === 'calendar' && (
