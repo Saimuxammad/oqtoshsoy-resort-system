@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, getDay, startOfWeek, endOfWeek } from 'date-fns';
 import { uz } from 'date-fns/locale';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useQuery } from 'react-query';
@@ -70,7 +70,7 @@ export function CalendarView({ selectedRoom }) {
           </Button>
 
           <span className="px-3 font-medium text-gray-900">
-            {format(currentDate, 'MMMM yyyy', { locale: uz })}
+            {format(currentDate, 'LLLL yyyy', { locale: uz })}
           </span>
 
           <Button
@@ -99,13 +99,13 @@ export function CalendarView({ selectedRoom }) {
             <div
               key={idx}
               className={clsx(
-                'aspect-square flex items-center justify-center text-sm rounded-lg cursor-default',
+                'aspect-square flex items-center justify-center text-sm rounded-lg',
                 {
                   'bg-red-100 text-red-800 font-medium': booked && currentMonth,
-                  'bg-primary-100 text-primary-800 font-semibold': today,
+                  'bg-blue-100 text-blue-800 font-semibold': today,
                   'hover:bg-gray-100': !booked && !today && currentMonth,
                   'text-gray-400': !currentMonth,
-                  'text-gray-900': currentMonth && !booked && !today
+                  'text-gray-700': currentMonth && !booked && !today
                 }
               )}
             >
@@ -121,7 +121,7 @@ export function CalendarView({ selectedRoom }) {
           <span className="text-gray-600">Band kunlar</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <div className="w-4 h-4 bg-primary-100 rounded"></div>
+          <div className="w-4 h-4 bg-blue-100 rounded"></div>
           <span className="text-gray-600">Bugun</span>
         </div>
       </div>

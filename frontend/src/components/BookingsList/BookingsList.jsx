@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { bookingService } from '../../services/bookingService';
-import { roomService } from '../../services/roomService';
 import { Loading } from '../UI/Loading';
 import { Button } from '../UI/Button';
 import { Card, CardContent } from '../UI/Card';
@@ -11,11 +10,8 @@ import { ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 export function BookingsList() {
-  const queryClient = useQueryClient();
   const [filters, setFilters] = useState({});
-
-  // Загружаем все комнаты для сопоставления ID с номерами
-  const { data: rooms } = useQuery('allRooms', () => roomService.getRooms());
+  const queryClient = useQueryClient();
 
   const { data: bookings, isLoading, refetch } = useQuery(
     ['bookings', filters],
@@ -36,19 +32,10 @@ export function BookingsList() {
         toast.success('Bron o\'chirildi');
       },
       onError: (error) => {
-        if (error.response?.status === 403) {
-          toast.error('Bronni o\'chirish uchun admin huquqi kerak');
-        } else {
-          toast.error('Xatolik yuz berdi');
-        }
+        toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
       }
     }
   );
-
-  const handleRefresh = () => {
-    refetch();
-    toast.success('Yangilandi');
-  };
 
   const handleDelete = (bookingId) => {
     if (window.confirm('Bronni o\'chirishni tasdiqlaysizmi?')) {
@@ -56,10 +43,9 @@ export function BookingsList() {
     }
   };
 
-  // Функция для получения информации о комнате по ID
-  const getRoomInfo = (roomId) => {
-    const room = rooms?.find(r => r.id === roomId);
-    return room || null;
+  const handleRefresh = () => {
+    refetch();
+    toast.success('Yangilandi');
   };
 
   if (isLoading) return <Loading />;
@@ -88,57 +74,51 @@ export function BookingsList() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {bookings.map((booking) => {
-            const roomInfo = getRoomInfo(booking.room_id);
-            return (
-              <Card key={booking.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Xona №{roomInfo?.room_number || booking.room_id}
-                        </h3>
-                        {roomInfo && (
-                          <span className="text-sm text-gray-600">
-                            {roomInfo.room_type}
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-sm text-gray-600 mb-1">
-                        <span className="font-medium">Sanalar:</span>{' '}
-                        {format(new Date(booking.start_date), 'dd MMMM yyyy', { locale: uz })} - {' '}
-                        {format(new Date(booking.end_date), 'dd MMMM yyyy', { locale: uz })}
-                      </p>
-
-                      {booking.guest_name && (
-                        <p className="text-sm text-gray-600 mb-1">
-                          <span className="font-medium">Mehmon:</span> {booking.guest_name}
-                        </p>
-                      )}
-
-                      {booking.notes && (
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Izoh:</span> {booking.notes}
-                        </p>
-                      )}
+          {bookings.map((booking) => (
+            <Card key={booking.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Xona №{booking.room?.room_number || booking.room_id}
+                      </h3>
+                      <span className="text-sm text-gray-600">
+                        {booking.room?.room_type}
+                      </span>
                     </div>
 
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleDelete(booking.id)}
-                      loading={deleteMutation.isLoading}
-                      title="O'chirish"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </Button>
+                    <p className="text-sm text-gray-600 mb-1">
+                      <span className="font-medium">Sanalar:</span>{' '}
+                      {format(new Date(booking.start_date), 'dd MMMM yyyy', { locale: uz })} - {' '}
+                      {format(new Date(booking.end_date), 'dd MMMM yyyy', { locale: uz })}
+                    </p>
+
+                    {booking.guest_name && (
+                      <p className="text-sm text-gray-600 mb-1">
+                        <span className="font-medium">Mehmon:</span> {booking.guest_name}
+                      </p>
+                    )}
+
+                    {booking.notes && (
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Izoh:</span> {booking.notes}
+                      </p>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDelete(booking.id)}
+                    loading={deleteMutation.isLoading}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>
