@@ -1,113 +1,132 @@
 import React, { useState } from 'react';
-import { useQuery } from 'react-query';
-import { roomService } from '../../services/roomService';
-import { RoomCard } from './RoomCard';
-import { RoomFilter } from './RoomFilter';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { bookingService } from '../../services/bookingService';
 import { Loading } from '../UI/Loading';
 import { Button } from '../UI/Button';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { Card, CardContent } from '../UI/Card';
+import { format } from 'date-fns';
+import { uz } from 'date-fns/locale';
+import { ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
-// ВАЖНО: Используем именованный экспорт
-export function RoomList({ onEditRoom, onViewCalendar }) {
+export function BookingsList() {
   const [filters, setFilters] = useState({});
+  const queryClient = useQueryClient();
 
-  const { data: rooms, isLoading, error, refetch } = useQuery(
-    ['rooms', filters],
-    () => roomService.getRooms(filters),
+  const { data: bookings, isLoading, refetch } = useQuery(
+    ['bookings', filters],
+    () => bookingService.getBookings(filters),
     {
       onError: (error) => {
-        console.error('Room fetch error:', error);
-        toast.error(`Xonalarni yuklashda xatolik: ${error.message}`);
-      },
-      onSuccess: (data) => {
-        console.log('Rooms loaded successfully:', data);
+        toast.error('Bronlarni yuklashda xatolik');
       }
     }
   );
+
+  const deleteMutation = useMutation(
+    (bookingId) => bookingService.deleteBooking(bookingId),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('bookings');
+        queryClient.invalidateQueries('rooms');
+        toast.success('Bron bekor qilindi');
+      },
+      onError: (error) => {
+        console.error('Delete error:', error);
+        toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
+      }
+    }
+  );
+
+  const handleDelete = async (bookingId) => {
+    const confirmed = await window.Telegram?.WebApp?.showConfirm?.(
+      'Bronni bekor qilishni tasdiqlaysizmi?'
+    ) ?? window.confirm('Bronni bekor qilishni tasdiqlaysizmi?');
+
+    if (confirmed) {
+      deleteMutation.mutate(bookingId);
+    }
+  };
 
   const handleRefresh = () => {
     refetch();
     toast.success('Yangilandi');
   };
 
-  // Group rooms by type
-  const groupedRooms = rooms?.reduce((acc, room) => {
-    const type = room.room_type;
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(room);
-    return acc;
-  }, {}) || {};
-
   if (isLoading) return <Loading />;
 
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-600 mb-4">Xatolik yuz berdi</p>
-        <p className="text-gray-600 mb-4">{error.message}</p>
-        <Button onClick={handleRefresh} variant="secondary">
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">
+          Barcha bronlar {bookings && `(${bookings.length})`}
+        </h2>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleRefresh}
+        >
           <ArrowPathIcon className="h-4 w-4 mr-2" />
-          Qayta urinish
+          Qayta yuklash
         </Button>
       </div>
-    );
-  }
 
-  return (
-    <div className="flex flex-col lg:flex-row gap-6">
-      {/* Filters - Sidebar on desktop, top on mobile */}
-      <div className="lg:w-64 flex-shrink-0">
-        <RoomFilter filters={filters} onChange={setFilters} />
-      </div>
+      {!bookings || bookings.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12 text-gray-500">
+            <p>Hozircha bronlar yo'q</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {bookings.map((booking) => (
+            <Card key={booking.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Xona №{booking.room?.room_number || booking.room_id}
+                      </h3>
+                      <span className="text-sm text-gray-600">
+                        {booking.room?.room_type}
+                      </span>
+                    </div>
 
-      {/* Room List */}
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Xonalar ro'yxati {rooms && `(${rooms.length})`}
-          </h2>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleRefresh}
-          >
-            <ArrowPathIcon className="h-4 w-4 mr-2" />
-            Qayta yuklash
-          </Button>
-        </div>
+                    <p className="text-sm text-gray-600 mb-1">
+                      <span className="font-medium">Sanalar:</span>{' '}
+                      {format(new Date(booking.start_date), 'dd MMMM yyyy', { locale: uz })} - {' '}
+                      {format(new Date(booking.end_date), 'dd MMMM yyyy', { locale: uz })}
+                    </p>
 
-        {!rooms || rooms.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Xonalar topilmadi</p>
-            <p className="text-sm mt-2">Backend serverini tekshiring</p>
-          </div>
-        ) : Object.keys(groupedRooms).length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Filtrlangan xonalar topilmadi</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedRooms).map(([type, typeRooms]) => (
-              <div key={type}>
-                <h3 className="text-lg font-medium text-gray-800 mb-3">
-                  {type} ({typeRooms.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {typeRooms.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onEdit={onEditRoom}
-                      onViewCalendar={onViewCalendar}
-                    />
-                  ))}
+                    {booking.guest_name && (
+                      <p className="text-sm text-gray-600 mb-1">
+                        <span className="font-medium">Mehmon:</span> {booking.guest_name}
+                      </p>
+                    )}
+
+                    {booking.notes && (
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Izoh:</span> {booking.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDelete(booking.id)}
+                    loading={deleteMutation.isLoading && deleteMutation.variables === booking.id}
+                    title="Bronni bekor qilish"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

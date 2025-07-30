@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, startOfWeek, endOfWeek } from 'date-fns';
 import { uz } from 'date-fns/locale';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useQuery } from 'react-query';
@@ -12,6 +12,8 @@ export function CalendarView({ selectedRoom }) {
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
   const { data: bookings = [] } = useQuery(
     ['bookings', selectedRoom?.id, monthStart, monthEnd],
@@ -25,7 +27,7 @@ export function CalendarView({ selectedRoom }) {
     }
   );
 
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const isBooked = (date) => {
     return bookings.some(booking => {
@@ -67,7 +69,7 @@ export function CalendarView({ selectedRoom }) {
             <ChevronLeftIcon className="h-4 w-4" />
           </Button>
 
-          <span className="px-3 font-medium">
+          <span className="px-3 font-medium text-gray-900">
             {format(currentDate, 'MMMM yyyy', { locale: uz })}
           </span>
 
@@ -83,7 +85,7 @@ export function CalendarView({ selectedRoom }) {
 
       <div className="grid grid-cols-7 gap-1">
         {['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'].map(day => (
-          <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
+          <div key={day} className="text-center text-xs font-medium text-gray-700 py-2">
             {day}
           </div>
         ))}
@@ -91,17 +93,19 @@ export function CalendarView({ selectedRoom }) {
         {days.map((day, idx) => {
           const booked = isBooked(day);
           const today = isToday(day);
+          const currentMonth = isSameMonth(day, currentDate);
 
           return (
             <div
               key={idx}
               className={clsx(
-                'aspect-square flex items-center justify-center text-sm rounded-lg',
+                'aspect-square flex items-center justify-center text-sm rounded-lg cursor-default',
                 {
-                  'bg-red-100 text-red-800': booked,
+                  'bg-red-100 text-red-800 font-medium': booked && currentMonth,
                   'bg-primary-100 text-primary-800 font-semibold': today,
-                  'hover:bg-gray-100': !booked && !today,
-                  'text-gray-400': !isSameMonth(day, currentDate)
+                  'hover:bg-gray-100': !booked && !today && currentMonth,
+                  'text-gray-400': !currentMonth,
+                  'text-gray-900': currentMonth && !booked && !today
                 }
               )}
             >

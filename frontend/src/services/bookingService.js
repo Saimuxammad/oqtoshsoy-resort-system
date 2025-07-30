@@ -26,6 +26,7 @@ export const bookingService = {
 
   // Delete booking
   deleteBooking: async (bookingId) => {
+    console.log('Deleting booking:', bookingId);
     const response = await api.delete(`/bookings/${bookingId}`);
     return response.data;
   }

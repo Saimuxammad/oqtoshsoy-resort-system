@@ -22,27 +22,29 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
       },
       onError: (error) => {
         console.error('Cancel booking error:', error);
-        if (error.response?.status === 403) {
-          toast.error('Bronni bekor qilish uchun admin huquqi kerak');
-        } else if (error.response?.status === 404) {
-          toast.error('Bron topilmadi');
-        } else {
-          toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
-        }
+        const errorMessage = error.response?.data?.detail || 'Xatolik yuz berdi';
+        toast.error(errorMessage);
       }
     }
   );
 
-  const handleCancelBooking = () => {
+  const handleCancelBooking = async (e) => {
+    e.stopPropagation();
+
     if (room.current_booking?.id) {
-      if (window.confirm('Bronni bekor qilishni tasdiqlaysizmi?')) {
-        cancelBookingMutation.mutate(room.current_booking.id);
+      try {
+        const confirmed = await window.Telegram?.WebApp?.showConfirm?.(
+          'Bronni bekor qilishni tasdiqlaysizmi?'
+        ) ?? window.confirm('Bronni bekor qilishni tasdiqlaysizmi?');
+
+        if (confirmed) {
+          cancelBookingMutation.mutate(room.current_booking.id);
+        }
+      } catch (error) {
+        console.error('Error in cancel booking:', error);
       }
     }
   };
-
-  // Admin yoki o'zi yaratgan bronni bekor qilish mumkin
-  const canCancelBooking = room.current_booking && user;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -71,13 +73,14 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
           </div>
 
           <div className="flex gap-2">
-            {canCancelBooking && (
+            {room.current_booking && !room.is_available && (
               <Button
                 variant="danger"
                 size="sm"
                 onClick={handleCancelBooking}
                 title="Bronni bekor qilish"
                 loading={cancelBookingMutation.isLoading}
+                disabled={cancelBookingMutation.isLoading}
               >
                 <XMarkIcon className="h-4 w-4" />
               </Button>
@@ -94,7 +97,7 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
               variant="ghost"
               size="sm"
               onClick={() => onEdit(room)}
-              title={room.is_available ? "Bron qilish" : "Tahrirlash"}
+              title="Bron qilish"
             >
               <PencilIcon className="h-4 w-4" />
             </Button>
