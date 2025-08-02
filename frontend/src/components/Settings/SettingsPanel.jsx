@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -7,14 +7,30 @@ import {
   LanguageIcon,
   BellIcon,
   MoonIcon,
-  SunIcon
+  SunIcon,
+  SwatchIcon
 } from '@heroicons/react/24/outline';
 
 export function SettingsPanel() {
   const { t, language, changeLanguage } = useLanguage();
-  const { user } = useTelegram();
+  const { user, colorScheme, setHeaderColor, setBackgroundColor } = useTelegram();
   const [notifications, setNotifications] = React.useState(true);
-  const [theme, setTheme] = React.useState('light');
+  const [theme, setTheme] = React.useState(colorScheme || 'light');
+
+  // Предустановленные цветовые темы
+  const colorThemes = [
+    { name: 'Klassik ko\'k', header: '#3b82f6', background: '#f3f4f6' },
+    { name: 'To\'q ko\'k', header: '#1e40af', background: '#f3f4f6' },
+    { name: 'Yashil', header: '#059669', background: '#f3f4f6' },
+    { name: 'Qizil', header: '#dc2626', background: '#f3f4f6' },
+    { name: 'Binafsha', header: '#7c3aed', background: '#f3f4f6' },
+    { name: 'Qora', header: '#111827', background: '#f3f4f6' },
+  ];
+
+  const applyColorTheme = (theme) => {
+    setHeaderColor(theme.header);
+    setBackgroundColor(theme.background);
+  };
 
   return (
     <div className="space-y-6">
@@ -45,6 +61,36 @@ export function SettingsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Color Theme Settings - только в Telegram */}
+      {window.Telegram?.WebApp && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <SwatchIcon className="h-5 w-5 text-gray-600" />
+              <h3 className="text-lg font-medium">Rang sozlamalari</h3>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {colorThemes.map((theme) => (
+                <Button
+                  key={theme.name}
+                  variant="secondary"
+                  onClick={() => applyColorTheme(theme)}
+                  className="flex items-center gap-2"
+                >
+                  <div
+                    className="w-4 h-4 rounded-full border border-gray-300"
+                    style={{ backgroundColor: theme.header }}
+                  />
+                  {theme.name}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notification Settings */}
       <Card>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 export function useTelegram() {
   const [isReady, setIsReady] = useState(false);
   const [user, setUser] = useState(null);
+  const [colorScheme, setColorScheme] = useState('light');
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -28,14 +29,19 @@ export function useTelegram() {
       // Включаем кнопку закрытия
       tg.enableClosingConfirmation();
 
-      // Устанавливаем цвет заголовка
-      if (tg.setHeaderColor) {
-        tg.setHeaderColor('#3b82f6');
-      }
+      // Устанавливаем цветовую схему
+      const scheme = tg.colorScheme || 'light';
+      setColorScheme(scheme);
 
-      // Устанавливаем цвет фона
-      if (tg.setBackgroundColor) {
-        tg.setBackgroundColor('#f3f4f6');
+      // Устанавливаем цвета в соответствии с темой
+      if (scheme === 'dark') {
+        // Темная тема
+        tg.setHeaderColor('#1e293b'); // Темно-синий
+        tg.setBackgroundColor('#0f172a'); // Еще темнее
+      } else {
+        // Светлая тема - ваш синий цвет
+        tg.setHeaderColor('#3b82f6'); // Синий как на скриншоте
+        tg.setBackgroundColor('#f3f4f6'); // Светло-серый фон
       }
 
       // Получаем данные пользователя
@@ -86,6 +92,19 @@ export function useTelegram() {
     isReady,
     showAlert,
     showConfirm,
-    close
+    close,
+    colorScheme,
+    setHeaderColor: (color) => {
+      const tg = window.Telegram?.WebApp;
+      if (tg && tg.setHeaderColor) {
+        tg.setHeaderColor(color);
+      }
+    },
+    setBackgroundColor: (color) => {
+      const tg = window.Telegram?.WebApp;
+      if (tg && tg.setBackgroundColor) {
+        tg.setBackgroundColor(color);
+      }
+    }
   };
 }
