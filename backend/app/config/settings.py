@@ -1,4 +1,5 @@
 import os
+from typing import List
 from pydantic_settings import BaseSettings
 
 
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_WEB_APP_SECRET: str = os.getenv("TELEGRAM_WEB_APP_SECRET", "WebAppData")
+    ALLOWED_TELEGRAM_IDS: List[int] = [
+        int(id.strip()) for id in os.getenv("ALLOWED_TELEGRAM_IDS", "").split(",")
+        if id.strip()
+    ]
 
     # Frontend
     FRONTEND_URL: str = os.getenv(
