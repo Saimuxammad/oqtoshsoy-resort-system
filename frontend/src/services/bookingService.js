@@ -55,44 +55,121 @@ export const bookingService = {
     }
   },
 
-  // Delete booking
+  // Delete booking - улучшенная версия с детальным логированием
   deleteBooking: async (bookingId) => {
     try {
-      console.log('Deleting booking:', bookingId);
+      console.log('[BookingService] Starting delete for booking:', bookingId);
 
       // Получаем токен
       const token = localStorage.getItem('auth_token') ||
                     sessionStorage.getItem('auth_token') ||
                     'dev_token';
 
-      // Используем прямой fetch как временное решение
-      const url = `https://oqtoshsoy-resort-system-production.up.railway.app/api/bookings/${bookingId}`;
-      console.log('Direct fetch to:', url);
+      // Базовый URL без trailing slash
+      const baseUrl = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
+      const url = `${baseUrl}/bookings/${bookingId}`;
+
+      console.log('[BookingService] DELETE URL:', url);
+      console.log('[BookingService] Token:', token ? `${token.substring(0, 20)}...` : 'none');
+      console.log('[BookingService] Current location:', window.location.href);
 
       const response = await fetch(url, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+          'Accept': 'application/json',
+          'Origin': window.location.origin
+        },
+        mode: 'cors',
+        credentials: 'include'
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
+      console.log('[BookingService] Response received:');
+      console.log('  Status:', response.status);
+      console.log('  Status Text:', response.statusText);
+      console.log('  OK:', response.ok);
+      console.log('  Headers:', Object.fromEntries(response.headers.entries()));
+
+      // Читаем тело ответа
+      const responseText = await response.text();
+      console.log('[BookingService] Response body:', responseText);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        // Пробуем парсить как JSON
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+          console.error('[BookingService] Error data:', errorData);
+        } catch (e) {
+          errorData = { detail: responseText || `HTTP ${response.status}: ${response.statusText}` };
+        }
+
+        // Создаем ошибку в формате, который ожидают компоненты
+        const error = new Error(errorData.detail || 'Delete failed');
+        error.response = {
+          status: response.status,
+          statusText: response.statusText,
+          data: errorData
+        };
+        throw error;
       }
 
-      const data = await response.json();
-      console.log('Booking deleted:', data);
+      // Парсим успешный ответ
+      let data;
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          // Если не JSON, возвращаем как есть
+          data = { message: responseText || 'Deleted successfully' };
+        }
+      } else {
+        data = { message: 'Deleted successfully' };
+      }
+
+      console.log('[BookingService] Delete successful:', data);
       return data;
 
     } catch (error) {
-      console.error('deleteBooking error:', error);
+      console.error('[BookingService] Delete error:', error);
+      console.error('[BookingService] Error stack:', error.stack);
+
+      // Если error.response уже есть, просто пробрасываем
+      if (error.response) {
+        throw error;
+      }
+
+      // Иначе создаем структуру ошибки
+      const wrappedError = new Error(error.message);
+      wrappedError.response = {
+        status: 0,
+        statusText: 'Network Error',
+        data: {
+          detail: error.message || 'Network error occurred'
+        }
+      };
+      throw wrappedError;
+    }
+  },
+
+  // Проверка доступности номера для бронирования
+  checkAvailability: async (roomId, startDate, endDate, excludeBookingId = null) => {
+    try {
+      const params = new URLSearchParams({
+        room_id: roomId,
+        start_date: startDate,
+        end_date: endDate
+      });
+
+      if (excludeBookingId) {
+        params.append('exclude_booking_id', excludeBookingId);
+      }
+
+      const response = await api.get(`/bookings/check-availability?${params}`);
+      return response.data;
+    } catch (error) {
+      console.error('checkAvailability error:', error);
       throw error;
     }
   }

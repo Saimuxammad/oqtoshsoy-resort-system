@@ -34,6 +34,12 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
   const handleCancelBooking = () => {
     if (room.current_booking?.id) {
       console.log('[RoomCard] Current booking:', room.current_booking);
+      console.log('[RoomCard] Booking ID to delete:', room.current_booking.id);
+      console.log('[RoomCard] Current URL:', window.location.href);
+
+      // Проверяем, какой URL будет использован
+      const testUrl = `https://oqtoshsoy-resort-system-production.up.railway.app/api/bookings/${room.current_booking.id}`;
+      console.log('[RoomCard] Will send DELETE to:', testUrl);
 
       // Используем стандартный confirm, если Telegram метод недоступен
       if (showConfirm && window.Telegram?.WebApp) {
