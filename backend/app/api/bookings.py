@@ -97,14 +97,14 @@ async def create_booking(
     return new_booking
 
 
-@router.patch("/{booking_id}", response_model=Booking)
-async def update_booking(
+# Общая функция для обновления бронирования
+async def _update_booking_handler(
         booking_id: int,
         booking_update: BookingUpdate,
-        db: Session = Depends(get_db),
-        current_user=Depends(get_current_user)
+        db: Session,
+        current_user
 ):
-    """Update booking"""
+    """Common handler for updating booking"""
     booking = BookingService.get_booking(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -154,6 +154,28 @@ async def update_booking(
     return updated_booking
 
 
+@router.patch("/{booking_id}", response_model=Booking)
+async def update_booking_patch(
+        booking_id: int,
+        booking_update: BookingUpdate,
+        db: Session = Depends(get_db),
+        current_user=Depends(get_current_user)
+):
+    """Update booking using PATCH method"""
+    return await _update_booking_handler(booking_id, booking_update, db, current_user)
+
+
+@router.put("/{booking_id}", response_model=Booking)
+async def update_booking_put(
+        booking_id: int,
+        booking_update: BookingUpdate,
+        db: Session = Depends(get_db),
+        current_user=Depends(get_current_user)
+):
+    """Update booking using PUT method"""
+    return await _update_booking_handler(booking_id, booking_update, db, current_user)
+
+
 @router.delete("/{booking_id}")
 async def delete_booking(
         booking_id: int,
@@ -192,3 +214,25 @@ async def delete_booking(
     await manager.broadcast_booking_update(booking_id, "delete", {"room_id": room.id})
 
     return {"message": "Booking deleted successfully"}
+
+
+@router.get("/check-availability/", response_model=dict)
+async def check_availability(
+        room_id: int = Query(...),
+        start_date: date = Query(...),
+        end_date: date = Query(...),
+        exclude_booking_id: Optional[int] = Query(None),
+        db: Session = Depends(get_db),
+        current_user=Depends(get_current_user)
+):
+    """Check if room is available for given dates"""
+    is_available = BookingService.check_availability(
+        db, room_id, start_date, end_date, exclude_booking_id
+    )
+
+    return {
+        "available": is_available,
+        "room_id": room_id,
+        "start_date": str(start_date),
+        "end_date": str(end_date)
+    }

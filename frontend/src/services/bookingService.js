@@ -42,15 +42,75 @@ export const bookingService = {
     }
   },
 
-  // Update booking
+  // Update booking - используем PUT вместо PATCH
   updateBooking: async (bookingId, data) => {
     try {
-      console.log('Updating booking:', bookingId, data);
-      const response = await api.patch(`/bookings/${bookingId}`, data);
-      console.log('Booking updated:', response.data);
-      return response.data;
+      console.log('[BookingService] Updating booking:', bookingId, data);
+
+      // Получаем токен
+      const token = localStorage.getItem('auth_token') ||
+                    sessionStorage.getItem('auth_token') ||
+                    'dev_token';
+
+      // Базовый URL
+      const baseUrl = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
+      const url = `${baseUrl}/bookings/${bookingId}`;
+
+      console.log('[BookingService] UPDATE URL:', url);
+      console.log('[BookingService] Update data:', data);
+
+      // Пробуем сначала PATCH
+      let response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      // Если PATCH не поддерживается, пробуем PUT
+      if (response.status === 405) {
+        console.log('[BookingService] PATCH not allowed, trying PUT...');
+        response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+      }
+
+      console.log('[BookingService] Update response:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[BookingService] Update error:', errorText);
+
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { detail: errorText || `HTTP ${response.status}` };
+        }
+
+        const error = new Error(errorData.detail || 'Update failed');
+        error.response = {
+          status: response.status,
+          data: errorData
+        };
+        throw error;
+      }
+
+      const result = await response.json();
+      console.log('[BookingService] Booking updated:', result);
+      return result;
+
     } catch (error) {
-      console.error('updateBooking error:', error);
+      console.error('[BookingService] updateBooking error:', error);
       throw error;
     }
   },

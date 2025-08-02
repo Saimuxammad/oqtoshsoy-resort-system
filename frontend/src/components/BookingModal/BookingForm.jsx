@@ -47,8 +47,15 @@ export function BookingForm({ room, booking, onSubmit, onCancel, onDelete, onExt
       end_date: formData.end_date.toISOString().split('T')[0]
     };
 
-    console.log('BookingForm submitting:', submitData);
-    onSubmit(submitData);
+    console.log('BookingForm submitting:', { isExtending, submitData });
+
+    // При продлении всегда создаем новое бронирование
+    if (isExtending) {
+      // Передаем данные для создания нового бронирования
+      onSubmit(submitData, true); // true означает, что это продление
+    } else {
+      onSubmit(submitData, false);
+    }
   };
 
   const handleExtendClick = () => {

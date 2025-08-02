@@ -53,17 +53,17 @@ export function BookingModal({ isOpen, onClose, room, booking = null }) {
     }
   );
 
-  const handleSubmit = (data) => {
-    console.log('BookingModal handleSubmit:', { booking, data });
+  const handleSubmit = (data, isExtending = false) => {
+    console.log('BookingModal handleSubmit:', { booking, data, isExtending });
 
-    // Проверяем, не занят ли номер в выбранные даты
-    // Это особенно важно при продлении бронирования
-
-    if (booking) {
-      // Если обновляем существующее бронирование
+    // При продлении всегда создаем новое бронирование
+    if (isExtending) {
+      createMutation.mutate(data);
+    } else if (booking) {
+      // Обновляем существующее бронирование
       updateMutation.mutate({ id: booking.id, ...data });
     } else {
-      // Создаем новое бронирование (в том числе при продлении)
+      // Создаем новое бронирование
       createMutation.mutate(data);
     }
   };
