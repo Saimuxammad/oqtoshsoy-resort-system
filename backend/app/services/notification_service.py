@@ -1,96 +1,139 @@
 import os
-from aiogram import Bot
+import httpx
+from datetime import datetime, date
 from typing import Optional
-from datetime import datetime
 from sqlalchemy.orm import Session
 
 from ..models.booking import Booking
 from ..models.room import Room
 from ..models.user import User
-from ..config import settings
 
 
 class NotificationService:
     def __init__(self):
-        self.bot_token = settings.TELEGRAM_BOT_TOKEN
-        self.bot = Bot(token=self.bot_token) if self.bot_token else None
-        self.allowed_ids = os.getenv("ALLOWED_TELEGRAM_IDS", "").split(",")
+        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self.web_app_url = os.getenv("WEB_APP_URL", "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app")
 
-    async def send_message(self, chat_id: int, text: str):
-        """Send message to Telegram user"""
-        if not self.bot:
-            print(f"[Notification] Bot not configured, skipping message to {chat_id}")
+    async def send_message(self, chat_id: int, text: str, parse_mode: str = "HTML"):
+        """Send message via Telegram Bot API"""
+        if not self.bot_token:
+            print("Telegram bot token not configured")
             return
 
         try:
-            await self.bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
-            print(f"[Notification] Message sent to {chat_id}")
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": text,
+                        "parse_mode": parse_mode
+                    }
+                )
+                if response.status_code != 200:
+                    print(f"Failed to send message: {response.text}")
         except Exception as e:
-            print(f"[Notification] Error sending message to {chat_id}: {e}")
+            print(f"Error sending telegram message: {e}")
 
     async def send_booking_created(self, db: Session, booking: Booking, room: Room, user: User):
         """Send notification about new booking"""
-        if not self.bot:
-            return
-
+        # Format dates
         start_date = booking.start_date.strftime("%d.%m.%Y")
         end_date = booking.end_date.strftime("%d.%m.%Y")
 
-        message = (
+        text = (
             f"✅ <b>Yangi bron yaratildi</b>\n\n"
             f"🏠 Xona: №{room.room_number} ({room.room_type})\n"
             f"📅 Sanalar: {start_date} - {end_date}\n"
             f"👤 Mehmon: {booking.guest_name or 'Ko\'rsatilmagan'}\n"
-            f"👨‍💼 Yaratdi: {user.full_name}\n"
-            f"🕐 Vaqt: {datetime.now().strftime('%H:%M')}"
+            f"💬 Izoh: {booking.notes or 'Yo\'q'}\n"
+            f"👨‍💻 Kim tomonidan: {user.full_name}"
         )
 
         # Send to all admins
-        for telegram_id in self.allowed_ids:
-            if telegram_id.strip():
-                try:
-                    await self.send_message(int(telegram_id.strip()), message)
-                except:
-                    pass
+        admins = db.query(User).filter(User.is_admin == True).all()
+        for admin in admins:
+            if admin.telegram_id and admin.id != user.id:  # Don't send to the creator
+                await self.send_message(admin.telegram_id, text)
 
-    async def send_booking_cancelled(self, db: Session, booking: Booking, room: Room, user: User):
-        """Send notification about cancelled booking"""
-        if not self.bot:
-            return
-
+    async def send_booking_updated(self, db: Session, booking: Booking, room: Room, user: User, changes: dict):
+        """Send notification about booking update"""
+        # Format dates
         start_date = booking.start_date.strftime("%d.%m.%Y")
         end_date = booking.end_date.strftime("%d.%m.%Y")
 
-        message = (
+        text = (
+            f"📝 <b>Bron yangilandi</b>\n\n"
+            f"🏠 Xona: №{room.room_number} ({room.room_type})\n"
+            f"📅 Sanalar: {start_date} - {end_date}\n"
+            f"👤 Mehmon: {booking.guest_name or 'Ko\'rsatilmagan'}\n"
+            f"👨‍💻 Kim tomonidan: {user.full_name}"
+        )
+
+        # Send to all admins
+        admins = db.query(User).filter(User.is_admin == True).all()
+        for admin in admins:
+            if admin.telegram_id and admin.id != user.id:
+                await self.send_message(admin.telegram_id, text)
+
+    async def send_booking_cancelled(self, db: Session, booking: Booking, room: Room, user: User):
+        """Send notification about booking cancellation"""
+        # Format dates
+        start_date = booking.start_date.strftime("%d.%m.%Y")
+        end_date = booking.end_date.strftime("%d.%m.%Y")
+
+        text = (
             f"❌ <b>Bron bekor qilindi</b>\n\n"
             f"🏠 Xona: №{room.room_number} ({room.room_type})\n"
             f"📅 Sanalar: {start_date} - {end_date}\n"
             f"👤 Mehmon: {booking.guest_name or 'Ko\'rsatilmagan'}\n"
-            f"👨‍💼 Bekor qildi: {user.full_name}\n"
-            f"🕐 Vaqt: {datetime.now().strftime('%H:%M')}"
+            f"👨‍💻 Kim tomonidan: {user.full_name}"
         )
 
         # Send to all admins
-        for telegram_id in self.allowed_ids:
-            if telegram_id.strip():
-                try:
-                    await self.send_message(int(telegram_id.strip()), message)
-                except:
-                    pass
+        admins = db.query(User).filter(User.is_admin == True).all()
+        for admin in admins:
+            if admin.telegram_id and admin.id != user.id:
+                await self.send_message(admin.telegram_id, text)
 
     async def send_daily_report(self, db: Session):
-        """Send daily report to admins"""
-        if not self.bot:
-            return
+        """Send daily report to all admins"""
+        from ..models.booking import Booking
+        from sqlalchemy import and_
 
-        # TODO: Implement daily report logic
-        pass
+        today = date.today()
 
-    async def close(self):
-        """Close bot session"""
-        if self.bot:
-            await self.bot.session.close()
+        # Get today's check-ins
+        checkins = db.query(Booking).filter(Booking.start_date == today).all()
+
+        # Get today's check-outs
+        checkouts = db.query(Booking).filter(Booking.end_date == today).all()
+
+        # Get current occupancy
+        occupied = db.query(Booking).filter(
+            and_(
+                Booking.start_date <= today,
+                Booking.end_date >= today
+            )
+        ).count()
+
+        total_rooms = db.query(Room).count()
+
+        text = (
+            f"📊 <b>Kunlik hisobot - {today.strftime('%d.%m.%Y')}</b>\n\n"
+            f"📥 Bugun kirish: {len(checkins)} ta\n"
+            f"📤 Bugun chiqish: {len(checkouts)} ta\n"
+            f"🏠 Band xonalar: {occupied}/{total_rooms}\n"
+            f"📈 Bandlik: {(occupied / total_rooms * 100):.1f}%\n\n"
+            f"🔗 <a href='{self.web_app_url}'>Tizimga o'tish</a>"
+        )
+
+        # Send to all admins
+        admins = db.query(User).filter(User.is_admin == True).all()
+        for admin in admins:
+            if admin.telegram_id:
+                await self.send_message(admin.telegram_id, text)
 
 
-# Create global instance
 notification_service = NotificationService()
