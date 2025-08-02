@@ -40,8 +40,7 @@ class UserResponse(UserBase):
     can_manage_bookings: bool = False
     can_manage_users: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class TelegramAuthData(BaseModel):
