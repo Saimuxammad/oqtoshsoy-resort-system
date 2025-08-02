@@ -8,27 +8,28 @@ class UserBase(BaseModel):
     first_name: str
     last_name: Optional[str] = None
     username: Optional[str] = None
+    is_admin: bool = False
 
 
 class UserCreate(UserBase):
     pass
 
 
-class User(UserBase):
+class UserUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    is_admin: Optional[bool] = None
+
+
+class UserResponse(UserBase):
     id: int
-    is_admin: bool
-    is_active: bool
     created_at: datetime
-    last_login: Optional[datetime] = None
+    updated_at: datetime
 
     class Config:
         from_attributes = True
 
 
 class TelegramAuthData(BaseModel):
-    id: int
-    first_name: str
-    last_name: Optional[str] = None
-    username: Optional[str] = None
-    auth_date: int
-    hash: str
+    initData: str

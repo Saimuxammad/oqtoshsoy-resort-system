@@ -1,9 +1,16 @@
-from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+import os
 from ..database import get_db
 from ..models.user import User
+
+# JWT настройки
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 дней
 
 security = HTTPBearer(auto_error=False)
 
@@ -12,9 +19,8 @@ def get_current_user(
         credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
         db: Session = Depends(get_db)
 ) -> User:
-    """Get current user from token (simplified for development)"""
+    """Get current user from token"""
     # Для разработки - создаем/получаем тестового пользователя
-    # В production здесь должна быть проверка JWT токена
 
     # Проверяем, есть ли токен
     if not credentials:
@@ -33,8 +39,10 @@ def get_current_user(
             db.refresh(guest_user)
         return guest_user
 
+    token = credentials.credentials
+
     # Для development токенов
-    if credentials.credentials.startswith("dev_") or credentials.credentials.startswith("fallback_"):
+    if token.startswith("dev_") or token.startswith("fallback_"):
         admin_user = db.query(User).filter(User.is_admin == True).first()
         if not admin_user:
             admin_user = User(
@@ -49,16 +57,30 @@ def get_current_user(
             db.refresh(admin_user)
         return admin_user
 
-    # В production здесь должна быть проверка реального токена
-    # Пока возвращаем тестового пользователя
-    test_user = db.query(User).first()
-    if not test_user:
+    # Проверяем JWT токен
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
 
-    return test_user
+    return user
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
