@@ -11,10 +11,10 @@ import { CalendarView } from './components/Calendar/CalendarView';
 import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
 import { HistoryLog } from './components/History/HistoryLog';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
+import { AccessDenied } from './components/AccessDenied';
 import { Loading } from './components/UI/Loading';
 import { useTelegram } from './hooks/useTelegram';
 import { authService } from './services/authService';
-import { AccessDenied } from './components/AccessDenied';import { TestAPI } from './components/TestAPI';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +35,8 @@ function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [authToken, setAuthToken] = useState(null);
+  const [authError, setAuthError] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
 
   useEffect(() => {
     console.log('App starting...');
@@ -56,12 +58,25 @@ function AppContent() {
           console.log('Auth success:', data);
           setIsAuthenticated(true);
           setAuthToken(data.token || 'dev_token');
+          setUserInfo(data.user);
+
+          // Сохраняем информацию о пользователе
+          if (data.user) {
+            localStorage.setItem('current_user', JSON.stringify(data.user));
+          }
         })
         .catch((error) => {
           console.error('Authentication failed:', error);
-          // В production тоже разрешаем для тестирования
-          setIsAuthenticated(true);
-          setAuthToken('dev_token');
+
+          // Проверяем, это ошибка доступа или другая ошибка
+          if (error.response?.status === 403) {
+            setAuthError('Access denied. You are not authorized to use this system.');
+            setIsAuthenticated(false);
+          } else {
+            // В production тоже разрешаем для тестирования
+            setIsAuthenticated(true);
+            setAuthToken('dev_token');
+          }
         })
         .finally(() => {
           setIsLoading(false);
@@ -96,6 +111,10 @@ function AppContent() {
 
   if (isLoading) {
     return <Loading text="Tizimga ulanmoqda..." />;
+  }
+
+  if (!isAuthenticated && authError) {
+    return <AccessDenied message={authError} />;
   }
 
   if (!isAuthenticated) {
