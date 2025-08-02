@@ -59,12 +59,24 @@ export const bookingService = {
   deleteBooking: async (bookingId) => {
     try {
       console.log('Deleting booking:', bookingId);
+      console.log('API base URL:', api.defaults.baseURL);
+      console.log('Full URL:', `${api.defaults.baseURL}/bookings/${bookingId}`);
+
       const response = await api.delete(`/bookings/${bookingId}`);
       console.log('Booking deleted:', response.data);
       return response.data;
     } catch (error) {
       console.error('deleteBooking error:', error);
       console.error('Error response:', error.response);
+      console.error('Error config:', error.config);
+
+      // Показываем более детальную информацию об ошибке
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+      }
+
       throw error;
     }
   }
