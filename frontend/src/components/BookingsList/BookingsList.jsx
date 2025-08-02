@@ -34,12 +34,28 @@ export function BookingsList() {
       },
       onError: (error) => {
         console.error('Delete error:', error);
+
+        // Детальная информация об ошибке
+        if (error.response) {
+          console.error('Error status:', error.response.status);
+          console.error('Error data:', error.response.data);
+
+          // Специальная обработка для 405 Method Not Allowed
+          if (error.response.status === 405) {
+            toast.error('Server xatosi: Method Not Allowed. Backend konfiguratsiyasini tekshiring.');
+            return;
+          }
+        }
+
         toast.error(error.response?.data?.detail || 'Bronni o\'chirishda xatolik');
       }
     }
   );
 
   const handleDelete = (bookingId) => {
+    console.log('[Delete] Starting deletion for booking:', bookingId);
+    console.log('[Delete] Current URL:', window.location.href);
+
     if (window.confirm('Bronni o\'chirishni tasdiqlaysizmi?')) {
       deleteMutation.mutate(bookingId);
     }

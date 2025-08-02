@@ -59,18 +59,22 @@ app = FastAPI(
 )
 
 # Configure CORS - ИСПРАВЛЕННАЯ КОНФИГУРАЦИЯ
+origins = [
+    "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
+    "https://oqtoshsoy-resort-system-production.up.railway.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "http://localhost",
+    "https://web.telegram.org",
+    "*"  # Временно разрешаем все источники
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
-        "https://oqtoshsoy-resort-system-production.up.railway.app",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "*"  # Временно разрешаем все источники для отладки
-    ],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
