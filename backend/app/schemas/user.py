@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional
 from enum import Enum
@@ -34,13 +34,13 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
     updated_at: datetime
     can_manage_bookings: bool = False
     can_manage_users: bool = False
-
-    model_config = {"from_attributes": True}
 
 
 class TelegramAuthData(BaseModel):
