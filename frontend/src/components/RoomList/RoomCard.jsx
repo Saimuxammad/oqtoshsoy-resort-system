@@ -13,23 +13,41 @@ export function RoomCard({ room, onEdit, onViewCalendar }) {
   const { showConfirm } = useTelegram();
 
   const cancelBookingMutation = useMutation(
-    (bookingId) => bookingService.deleteBooking(bookingId),
+    (bookingId) => {
+      console.log('[RoomCard] Cancelling booking:', bookingId);
+      return bookingService.deleteBooking(bookingId);
+    },
     {
       onSuccess: () => {
+        console.log('[RoomCard] Booking cancelled successfully');
         queryClient.invalidateQueries('rooms');
+        queryClient.invalidateQueries('bookings');
         toast.success('Bron bekor qilindi');
       },
       onError: (error) => {
+        console.error('[RoomCard] Cancel booking error:', error);
         toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
       }
     }
   );
 
-  const handleCancelBooking = async () => {
+  const handleCancelBooking = () => {
     if (room.current_booking?.id) {
-      const confirmed = await showConfirm('Bronni bekor qilishni tasdiqlaysizmi?');
-      if (confirmed) {
-        cancelBookingMutation.mutate(room.current_booking.id);
+      console.log('[RoomCard] Current booking:', room.current_booking);
+
+      // Используем стандартный confirm, если Telegram метод недоступен
+      if (showConfirm && window.Telegram?.WebApp) {
+        showConfirm('Bronni bekor qilishni tasdiqlaysizmi?', (confirmed) => {
+          if (confirmed) {
+            cancelBookingMutation.mutate(room.current_booking.id);
+          }
+        });
+      } else {
+        // Fallback для браузера
+        const confirmed = window.confirm('Bronni bekor qilishni tasdiqlaysizmi?');
+        if (confirmed) {
+          cancelBookingMutation.mutate(room.current_booking.id);
+        }
       }
     }
   };
