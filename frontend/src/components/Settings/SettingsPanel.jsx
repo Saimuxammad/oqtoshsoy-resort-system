@@ -28,13 +28,28 @@ export function SettingsPanel() {
   ];
 
   const applyColorTheme = (theme) => {
+    console.log('[Settings] Applying color theme:', theme);
+
+    // Получаем Telegram WebApp
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+      console.error('[Settings] Telegram WebApp not available');
+      return;
+    }
+
+    // Выводим доступные методы
+    console.log('[Settings] Available methods:', {
+      setHeaderColor: !!tg.setHeaderColor,
+      setBackgroundColor: !!tg.setBackgroundColor,
+      setThemeParams: !!tg.setThemeParams,
+      headerColor: tg.headerColor,
+      themeParams: tg.themeParams,
+      version: tg.version
+    });
+
+    // Применяем цвета
     setHeaderColor(theme.header);
     setBackgroundColor(theme.background);
-    // Устанавливаем цвет нижней панели такой же как заголовок
-    const tg = window.Telegram?.WebApp;
-    if (tg && tg.setBottomBarColor) {
-      tg.setBottomBarColor(theme.header);
-    }
   };
 
   return (
@@ -77,6 +92,11 @@ export function SettingsPanel() {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
+                Eslatma: Rang o'zgarishi uchun ilovani qayta ochish kerak bo'lishi mumkin
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {colorThemes.map((theme) => (
                 <button

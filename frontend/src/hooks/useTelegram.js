@@ -34,27 +34,37 @@ export function useTelegram() {
       setColorScheme(scheme);
 
       // Устанавливаем цвета в соответствии с темой
-      if (scheme === 'dark') {
-        // Темная тема
-        if (tg.setHeaderColor) {
-          tg.setHeaderColor('#1e293b'); // Темно-синий
-        }
-        if (tg.setBackgroundColor) {
-          tg.setBackgroundColor('#0f172a'); // Еще темнее
-        }
-      } else {
-        // Светлая тема - ваш синий цвет
-        if (tg.setHeaderColor) {
-          tg.setHeaderColor('#3b82f6'); // Синий как на скриншоте
-        }
-        if (tg.setBackgroundColor) {
-          tg.setBackgroundColor('#ffffff'); // Белый фон
-        }
+      // В новых версиях Telegram WebApp API используется themeParams
+      if (tg.themeParams) {
+        console.log('[Telegram] Theme params:', tg.themeParams);
       }
 
-      // Дополнительно устанавливаем цвет нижней панели
-      if (tg.setBottomBarColor) {
-        tg.setBottomBarColor('#3b82f6'); // Такой же как заголовок
+      // Пробуем разные методы установки цвета
+      try {
+        // Метод 1: setHeaderColor (старый API)
+        if (tg.setHeaderColor) {
+          tg.setHeaderColor(scheme === 'dark' ? '#1e293b' : '#3b82f6');
+        }
+
+        // Метод 2: через CSS переменные
+        if (tg.headerColor !== undefined) {
+          tg.headerColor = scheme === 'dark' ? '#1e293b' : '#3b82f6';
+        }
+
+        // Метод 3: через тему
+        if (tg.setThemeParams) {
+          tg.setThemeParams({
+            bg_color: '#ffffff',
+            header_bg_color: scheme === 'dark' ? '#1e293b' : '#3b82f6',
+            text_color: '#000000',
+            hint_color: '#999999',
+            link_color: '#3b82f6',
+            button_color: '#3b82f6',
+            button_text_color: '#ffffff'
+          });
+        }
+      } catch (error) {
+        console.error('[Telegram] Error setting colors:', error);
       }
 
       // Получаем данные пользователя
@@ -109,8 +119,35 @@ export function useTelegram() {
     colorScheme,
     setHeaderColor: (color) => {
       const tg = window.Telegram?.WebApp;
-      if (tg && tg.setHeaderColor) {
-        tg.setHeaderColor(color);
+      if (!tg) return;
+
+      console.log('[Telegram] Setting header color to:', color);
+
+      // Пробуем все возможные методы
+      try {
+        // Метод 1
+        if (tg.setHeaderColor) {
+          tg.setHeaderColor(color);
+        }
+
+        // Метод 2
+        if (tg.headerColor !== undefined) {
+          tg.headerColor = color;
+        }
+
+        // Метод 3 - через параметры темы
+        if (tg.setThemeParams) {
+          tg.setThemeParams({
+            header_bg_color: color
+          });
+        }
+
+        // Метод 4 - через MainButton для теста
+        if (tg.MainButton) {
+          tg.MainButton.color = color;
+        }
+      } catch (error) {
+        console.error('[Telegram] Error in setHeaderColor:', error);
       }
     },
     setBackgroundColor: (color) => {
