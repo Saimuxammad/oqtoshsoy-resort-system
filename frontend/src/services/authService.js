@@ -1,44 +1,70 @@
-import api from './api';
+import api, { setAuthToken } from '../utils/api';
 
 export const authService = {
   authenticate: async (initData) => {
-    // Для разработки и production без Telegram
-    const mockAuthData = {
-      id: 123456789,
-      first_name: 'Test',
-      last_name: 'User',
-      username: 'testuser',
-      auth_date: Math.floor(Date.now() / 1000),
-      hash: 'development'
-    };
-
     try {
-      const response = await api.post('/auth/telegram', mockAuthData);
+      console.log('Authenticating with initData:', initData);
 
-      // Сохраняем токен
-      if (response.data.access_token) {
-        localStorage.setItem('auth_token', response.data.access_token);
-        console.log('Auth successful, token saved');
+      // Для Telegram WebApp
+      if (initData) {
+        const response = await api.post('/auth/telegram', { initData });
+        const { token, user } = response.data;
+
+        // Сохраняем токен
+        setAuthToken(token);
+
+        return { token, user };
       }
 
-      return response.data;
-    } catch (error) {
-      console.error('Auth error:', error);
+      // Для dev режима
+      console.log('Dev mode - using mock auth');
+      const mockToken = 'dev_token_' + Date.now();
+      setAuthToken(mockToken);
 
-      // Если аутентификация не удалась, попробуем без токена
-      // Backend должен работать в development режиме
       return {
-        access_token: 'dev_token',
-        user: mockAuthData
+        token: mockToken,
+        user: {
+          id: 1,
+          first_name: 'Dev',
+          last_name: 'User',
+          is_admin: true
+        }
+      };
+    } catch (error) {
+      console.error('Authentication error:', error);
+
+      // В случае ошибки все равно позволяем работать в dev режиме
+      const fallbackToken = 'fallback_token_' + Date.now();
+      setAuthToken(fallbackToken);
+
+      return {
+        token: fallbackToken,
+        user: {
+          id: 1,
+          first_name: 'Guest',
+          last_name: 'User',
+          is_admin: false
+        }
       };
     }
   },
 
-  getToken: () => {
-    return localStorage.getItem('auth_token');
+  logout: () => {
+    setAuthToken(null);
+    localStorage.clear();
+    sessionStorage.clear();
   },
 
-  logout: () => {
-    localStorage.removeItem('auth_token');
+  getCurrentUser: () => {
+    // Получаем сохраненного пользователя
+    const savedUser = localStorage.getItem('current_user');
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        console.error('Error parsing saved user:', e);
+      }
+    }
+    return null;
   }
 };
