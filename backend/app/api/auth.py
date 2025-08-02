@@ -9,7 +9,7 @@ import os
 
 from ..database import get_db
 from ..models.user import User
-from ..utils.dependencies import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from ..utils.dependencies import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 from ..schemas.user import UserResponse, TelegramAuthData
 
 router = APIRouter()
