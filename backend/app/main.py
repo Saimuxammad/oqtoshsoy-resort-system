@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
+import time
 
 from .database import engine, get_db
 from .models import room, booking, user, history
@@ -80,6 +81,44 @@ app.add_middleware(
     max_age=3600,
 )
 
+
+# Добавляем middleware для логирования всех запросов
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+
+    # Логируем входящий запрос
+    print(f"\n[{datetime.utcnow()}] {request.method} {request.url.path}")
+    print(f"Client: {request.client.host if request.client else 'Unknown'}")
+    print(f"Headers: {dict(request.headers)}")
+
+    # Для DELETE запросов логируем дополнительную информацию
+    if request.method == "DELETE":
+        print(f"DELETE request details:")
+        print(f"  Full URL: {request.url}")
+        print(f"  Path params: {request.path_params}")
+        print(f"  Query params: {dict(request.query_params)}")
+
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        print(f"Error processing request: {e}")
+        raise
+
+    # Логируем время выполнения
+    process_time = time.time() - start_time
+    print(f"Completed in {process_time:.2f}s with status {response.status_code}")
+
+    # Для ошибок 405 логируем дополнительную информацию
+    if response.status_code == 405:
+        print(f"Method Not Allowed for {request.method} {request.url.path}")
+        print(f"Available routes:")
+        for route in app.routes:
+            print(f"  {route.methods} {route.path}")
+
+    return response
+
+
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
@@ -87,7 +126,9 @@ app.include_router(bookings.router, prefix="/api/bookings", tags=["bookings"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(history_api.router, prefix="/api/history", tags=["history"])
-#app.include_router(websocket.router, prefix="/api", tags=["websocket"])
+
+
+# app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 
 
 @app.get("/")
@@ -132,6 +173,22 @@ async def health_check():
 @app.options("/{rest_of_path:path}")
 async def preflight_handler(rest_of_path: str):
     return {"message": "OK"}
+
+
+# Отладочный endpoint для проверки DELETE
+@app.delete("/api/test/delete/{item_id}")
+async def test_delete(item_id: int):
+    return {"message": f"DELETE test successful for item {item_id}"}
+
+
+# Выводим все зарегистрированные маршруты при запуске
+@app.on_event("startup")
+async def startup_event():
+    print("\n=== Registered Routes ===")
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            print(f"{route.methods} {route.path}")
+    print("========================\n")
 
 
 if __name__ == "__main__":

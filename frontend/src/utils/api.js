@@ -24,6 +24,12 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Важно: не добавлять trailing slash автоматически
+  paramsSerializer: params => {
+    return Object.entries(params)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('&');
+  }
 });
 
 // Request interceptor для добавления токена

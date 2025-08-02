@@ -59,24 +59,40 @@ export const bookingService = {
   deleteBooking: async (bookingId) => {
     try {
       console.log('Deleting booking:', bookingId);
-      console.log('API base URL:', api.defaults.baseURL);
-      console.log('Full URL:', `${api.defaults.baseURL}/bookings/${bookingId}`);
 
-      const response = await api.delete(`/bookings/${bookingId}`);
-      console.log('Booking deleted:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('deleteBooking error:', error);
-      console.error('Error response:', error.response);
-      console.error('Error config:', error.config);
+      // Получаем токен
+      const token = localStorage.getItem('auth_token') ||
+                    sessionStorage.getItem('auth_token') ||
+                    'dev_token';
 
-      // Показываем более детальную информацию об ошибке
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-        console.error('Response headers:', error.response.headers);
+      // Используем прямой fetch как временное решение
+      const url = `https://oqtoshsoy-resort-system-production.up.railway.app/api/bookings/${bookingId}`;
+      console.log('Direct fetch to:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
+      const data = await response.json();
+      console.log('Booking deleted:', data);
+      return data;
+
+    } catch (error) {
+      console.error('deleteBooking error:', error);
       throw error;
     }
   }
