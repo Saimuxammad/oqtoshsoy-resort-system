@@ -8,7 +8,8 @@ from urllib.parse import unquote
 import os
 
 from ..database import get_db
-from ..models.user import User
+from ..models.user import User, UserRole
+from ..config.admins import is_super_admin, is_admin, is_allowed_user
 from ..utils.dependencies import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 from ..schemas.user import UserResponse, TelegramAuthData
 
@@ -86,16 +87,36 @@ async def telegram_auth(
                 detail="Invalid user data"
             )
 
+        # Проверяем, разрешен ли доступ пользователю
+        if not is_allowed_user(telegram_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You are not authorized to use this system."
+            )
+
         user = db.query(User).filter(User.telegram_id == telegram_id).first()
 
         if not user:
             # Create new user
+            # Определяем роль на основе конфигурации
+            if is_super_admin(telegram_id):
+                role = UserRole.SUPER_ADMIN
+                is_admin_flag = True
+            elif is_admin(telegram_id):
+                role = UserRole.ADMIN
+                is_admin_flag = True
+            else:
+                role = UserRole.USER
+                is_admin_flag = False
+
             user = User(
                 telegram_id=telegram_id,
                 first_name=user_data.get("first_name", ""),
                 last_name=user_data.get("last_name", ""),
                 username=user_data.get("username", ""),
-                is_admin=False  # Set to True for specific telegram_ids if needed
+                is_admin=is_admin_flag,
+                role=role,
+                is_active=True
             )
             db.add(user)
             db.commit()
@@ -105,6 +126,15 @@ async def telegram_auth(
             user.first_name = user_data.get("first_name", user.first_name)
             user.last_name = user_data.get("last_name", user.last_name)
             user.username = user_data.get("username", user.username)
+
+            # Обновляем роль, если пользователь добавлен в админы
+            if is_super_admin(telegram_id):
+                user.role = UserRole.SUPER_ADMIN
+                user.is_admin = True
+            elif is_admin(telegram_id):
+                user.role = UserRole.ADMIN
+                user.is_admin = True
+
             db.commit()
 
         # Create access token

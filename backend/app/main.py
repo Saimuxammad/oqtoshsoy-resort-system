@@ -11,7 +11,7 @@ from .database import engine, get_db
 from .models import room, booking, user, history
 from .services.room_service import RoomService
 from .services.notification_service import notification_service
-from .api import rooms, bookings, auth, analytics, export, history as history_api  # websocket временно отключен
+from .api import rooms, bookings, auth, analytics, export, history as history_api, users  # websocket временно отключен
 
 # Create tables
 room.Base.metadata.create_all(bind=engine)
@@ -126,6 +126,7 @@ app.include_router(bookings.router, prefix="/api/bookings", tags=["bookings"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(history_api.router, prefix="/api/history", tags=["history"])
+app.include_router(users.router, prefix="/api/users", tags=["users"])
 
 
 # app.include_router(websocket.router, prefix="/api", tags=["websocket"])

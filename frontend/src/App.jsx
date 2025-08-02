@@ -14,6 +14,7 @@ import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { Loading } from './components/UI/Loading';
 import { useTelegram } from './hooks/useTelegram';
 import { authService } from './services/authService';
+import { AccessDenied } from './components/AccessDenied';import { TestAPI } from './components/TestAPI';
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -1,6 +1,13 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
+from enum import Enum
+
+
+class UserRoleEnum(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
 
 
 class UserBase(BaseModel):
@@ -9,6 +16,8 @@ class UserBase(BaseModel):
     last_name: Optional[str] = None
     username: Optional[str] = None
     is_admin: bool = False
+    role: UserRoleEnum = UserRoleEnum.USER
+    is_active: bool = True
 
 
 class UserCreate(UserBase):
@@ -20,12 +29,16 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     username: Optional[str] = None
     is_admin: Optional[bool] = None
+    role: Optional[UserRoleEnum] = None
+    is_active: Optional[bool] = None
 
 
 class UserResponse(UserBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    can_manage_bookings: bool = False
+    can_manage_users: bool = False
 
     class Config:
         from_attributes = True
