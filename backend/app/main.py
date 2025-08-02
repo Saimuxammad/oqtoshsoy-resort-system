@@ -58,18 +58,21 @@ app = FastAPI(
     redirect_slashes=False
 )
 
-# Configure CORS
+# Configure CORS - ИСПРАВЛЕННАЯ КОНФИГУРАЦИЯ
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
+        "https://oqtoshsoy-resort-system-production.up.railway.app",
         "http://localhost:5173",
         "http://localhost:5174",
-        "*"  # Временно для тестирования
+        "http://localhost:3000",
+        "https://*.railway.app",  # Разрешаем все поддомены Railway
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers
@@ -99,9 +102,31 @@ async def root():
     }
 
 
+@app.get("/api")
+async def api_root():
+    """API root endpoint"""
+    return {
+        "message": "API Root",
+        "endpoints": {
+            "auth": "/api/auth",
+            "rooms": "/api/rooms",
+            "bookings": "/api/bookings",
+            "analytics": "/api/analytics",
+            "export": "/api/export",
+            "history": "/api/history"
+        }
+    }
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}
+
+
+# Добавляем обработку OPTIONS запросов для CORS preflight
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    return {"message": "OK"}
 
 
 if __name__ == "__main__":
