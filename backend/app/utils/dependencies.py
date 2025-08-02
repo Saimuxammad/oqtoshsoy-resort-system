@@ -114,3 +114,40 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Admin privileges required"
         )
     return current_user
+
+
+async def get_current_user_ws(
+        token: str,
+        db: Session
+) -> Optional[User]:
+    """Get current user for WebSocket connections"""
+    if not token:
+        return None
+
+    # Для development токенов
+    if token.startswith("dev_") or token.startswith("fallback_"):
+        admin_user = db.query(User).filter(User.is_admin == True).first()
+        if not admin_user:
+            admin_user = User(
+                telegram_id=987654321,
+                first_name="Admin",
+                last_name="User",
+                username="admin_user",
+                is_admin=True
+            )
+            db.add(admin_user)
+            db.commit()
+            db.refresh(admin_user)
+        return admin_user
+
+    # Проверяем JWT токен
+    payload = verify_token(token)
+    if not payload:
+        return None
+
+    user_id = payload.get("user_id")
+    if not user_id:
+        return None
+
+    user = db.query(User).filter(User.id == user_id).first()
+    return user

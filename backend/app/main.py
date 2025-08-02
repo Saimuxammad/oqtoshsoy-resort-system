@@ -10,7 +10,7 @@ from .database import engine, get_db
 from .models import room, booking, user, history
 from .services.room_service import RoomService
 from .services.notification_service import notification_service
-from .api import rooms, bookings, auth, analytics, export, history as history_api, websocket
+from .api import rooms, bookings, auth, analytics, export, history as history_api  # websocket временно отключен
 
 # Create tables
 room.Base.metadata.create_all(bind=engine)
