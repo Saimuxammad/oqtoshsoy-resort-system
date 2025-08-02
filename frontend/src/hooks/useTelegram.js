@@ -36,12 +36,25 @@ export function useTelegram() {
       // Устанавливаем цвета в соответствии с темой
       if (scheme === 'dark') {
         // Темная тема
-        tg.setHeaderColor('#1e293b'); // Темно-синий
-        tg.setBackgroundColor('#0f172a'); // Еще темнее
+        if (tg.setHeaderColor) {
+          tg.setHeaderColor('#1e293b'); // Темно-синий
+        }
+        if (tg.setBackgroundColor) {
+          tg.setBackgroundColor('#0f172a'); // Еще темнее
+        }
       } else {
         // Светлая тема - ваш синий цвет
-        tg.setHeaderColor('#3b82f6'); // Синий как на скриншоте
-        tg.setBackgroundColor('#f3f4f6'); // Светло-серый фон
+        if (tg.setHeaderColor) {
+          tg.setHeaderColor('#3b82f6'); // Синий как на скриншоте
+        }
+        if (tg.setBackgroundColor) {
+          tg.setBackgroundColor('#ffffff'); // Белый фон
+        }
+      }
+
+      // Дополнительно устанавливаем цвет нижней панели
+      if (tg.setBottomBarColor) {
+        tg.setBottomBarColor('#3b82f6'); // Такой же как заголовок
       }
 
       // Получаем данные пользователя

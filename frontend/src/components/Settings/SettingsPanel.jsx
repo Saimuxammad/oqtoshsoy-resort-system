@@ -19,17 +19,22 @@ export function SettingsPanel() {
 
   // Предустановленные цветовые темы
   const colorThemes = [
-    { name: 'Klassik ko\'k', header: '#3b82f6', background: '#f3f4f6' },
-    { name: 'To\'q ko\'k', header: '#1e40af', background: '#f3f4f6' },
-    { name: 'Yashil', header: '#059669', background: '#f3f4f6' },
-    { name: 'Qizil', header: '#dc2626', background: '#f3f4f6' },
-    { name: 'Binafsha', header: '#7c3aed', background: '#f3f4f6' },
-    { name: 'Qora', header: '#111827', background: '#f3f4f6' },
+    { name: 'Klassik ko\'k', header: '#3b82f6', background: '#ffffff' },
+    { name: 'To\'q ko\'k', header: '#1e40af', background: '#ffffff' },
+    { name: 'Yashil', header: '#059669', background: '#ffffff' },
+    { name: 'Qizil', header: '#dc2626', background: '#ffffff' },
+    { name: 'Binafsha', header: '#7c3aed', background: '#ffffff' },
+    { name: 'Qora', header: '#111827', background: '#ffffff' },
   ];
 
   const applyColorTheme = (theme) => {
     setHeaderColor(theme.header);
     setBackgroundColor(theme.background);
+    // Устанавливаем цвет нижней панели такой же как заголовок
+    const tg = window.Telegram?.WebApp;
+    if (tg && tg.setBottomBarColor) {
+      tg.setBottomBarColor(theme.header);
+    }
   };
 
   return (
@@ -74,18 +79,17 @@ export function SettingsPanel() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {colorThemes.map((theme) => (
-                <Button
+                <button
                   key={theme.name}
-                  variant="secondary"
                   onClick={() => applyColorTheme(theme)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
                   <div
                     className="w-4 h-4 rounded-full border border-gray-300"
                     style={{ backgroundColor: theme.header }}
                   />
-                  {theme.name}
-                </Button>
+                  <span className="text-sm text-gray-700">{theme.name}</span>
+                </button>
               ))}
             </div>
           </CardContent>
