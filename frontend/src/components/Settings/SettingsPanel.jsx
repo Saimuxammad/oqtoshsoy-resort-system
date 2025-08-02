@@ -3,6 +3,7 @@ import { Card, CardHeader, CardContent } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTelegram } from '../../hooks/useTelegram';
+import toast from 'react-hot-toast';
 import {
   LanguageIcon,
   BellIcon,
@@ -82,39 +83,32 @@ export function SettingsPanel() {
         </CardContent>
       </Card>
 
-      {/* Color Theme Settings - только в Telegram */}
-      {window.Telegram?.WebApp && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <SwatchIcon className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-medium">Rang sozlamalari</h3>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-xs text-yellow-800">
-                Eslatma: Rang o'zgarishi uchun ilovani qayta ochish kerak bo'lishi mumkin
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {colorThemes.map((theme) => (
-                <button
-                  key={theme.name}
-                  onClick={() => applyColorTheme(theme)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  <div
-                    className="w-4 h-4 rounded-full border border-gray-300"
-                    style={{ backgroundColor: theme.header }}
-                  />
-                  <span className="text-sm text-gray-700">{theme.name}</span>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Color Theme Settings */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <SwatchIcon className="h-5 w-5 text-gray-600" />
+            <h3 className="text-lg font-medium">Rang sozlamalari</h3>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3">
+            {colorThemes.map((theme) => (
+              <button
+                key={theme.name}
+                onClick={() => applyColorTheme(theme)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <div
+                  className="w-4 h-4 rounded-full border border-gray-300"
+                  style={{ backgroundColor: theme.header }}
+                />
+                <span className="text-sm text-gray-700">{theme.name}</span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Notification Settings */}
       <Card>
