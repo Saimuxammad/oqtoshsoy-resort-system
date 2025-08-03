@@ -1,4 +1,25 @@
 export const roomService = {
+  import api from '../utils/api';
+
+export const roomService = {
+  getRooms: async (filters = {}) => {
+    try {
+      const response = await api.get('/rooms/list', {
+        params: filters
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[RoomService] getRooms error:', error);
+      throw error;
+    }
+  },
+
+  // 🔜 Дополнительные методы можно добавить ниже
+  // getRoom: async (roomId) => { ... }
+  // updateRoom: async (roomId, data) => { ... }
+};
+
+
   // Get all rooms
   getRooms: async (filters = {}) => {
     try {
