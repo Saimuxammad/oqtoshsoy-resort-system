@@ -15,78 +15,81 @@ router = APIRouter()
 
 @router.get("/list", response_model=List[Room])
 async def get_rooms(
-        skip: int = 0,
-        limit: int = 100,
-        room_type: Optional[str] = None,
-        is_available: Optional[bool] = None,
-        db: Session = Depends(get_db),
-        current_user=Depends(get_current_user)
+    skip: int = 0,
+    limit: int = 100,
+    room_type: Optional[str] = None,
+    is_available: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
 ):
     """Get all rooms with optional filters"""
-    query = db.query(RoomModel)
+    try:
+        print(f"[API] Filters: type={room_type}, available={is_available}")
+        query = db.query(RoomModel)
 
-    if room_type:
-        query = query.filter(RoomModel.room_type == room_type)
+        if room_type:
+            query = query.filter(RoomModel.room_type == room_type)
 
-    if is_available is not None:
-        today = date.today()
-        if is_available:
-            # Get rooms without current bookings
+        if is_available is not None:
+            today = date.today()
             booked_room_ids = db.query(Booking.room_id).filter(
                 Booking.start_date <= today,
                 Booking.end_date >= today
             ).scalar_subquery()
-            query = query.filter(~RoomModel.id.in_(booked_room_ids))
-        else:
-            # Get rooms with current bookings
-            booked_room_ids = db.query(Booking.room_id).filter(
+
+            if is_available:
+                query = query.filter(~RoomModel.id.in_(booked_room_ids))
+            else:
+                query = query.filter(RoomModel.id.in_(booked_room_ids))
+
+        rooms = query.offset(skip).limit(limit).all()
+        print(f"[API] Rooms found: {len(rooms)}")
+
+        result = []
+        today = date.today()
+        for room in rooms:
+            room_data = Room.from_orm(room)
+
+            # Current booking
+            current_booking = db.query(Booking).filter(
+                Booking.room_id == room.id,
                 Booking.start_date <= today,
                 Booking.end_date >= today
-            ).scalar_subquery()
-            query = query.filter(RoomModel.id.in_(booked_room_ids))
+            ).first()
 
-    rooms = query.offset(skip).limit(limit).all()
+            if current_booking:
+                room_data.current_booking = {
+                    "id": current_booking.id,
+                    "start_date": current_booking.start_date,
+                    "end_date": current_booking.end_date,
+                    "guest_name": current_booking.guest_name
+                }
+                room_data.is_available = False
+            else:
+                room_data.is_available = True
 
-    # Add current booking info
-    result = []
-    for room in rooms:
-        room_data = Room.from_orm(room)
+            # Upcoming bookings
+            upcoming = db.query(Booking).filter(
+                Booking.room_id == room.id,
+                Booking.start_date > today
+            ).order_by(Booking.start_date).limit(5).all()
 
-        # Get current booking
-        today = date.today()
-        current_booking = db.query(Booking).filter(
-            Booking.room_id == room.id,
-            Booking.start_date <= today,
-            Booking.end_date >= today
-        ).first()
+            room_data.upcoming_bookings = [
+                {
+                    "id": b.id,
+                    "start_date": b.start_date,
+                    "end_date": b.end_date,
+                    "guest_name": b.guest_name
+                } for b in upcoming
+            ]
 
-        if current_booking:
-            room_data.current_booking = {
-                "id": current_booking.id,
-                "start_date": current_booking.start_date,
-                "end_date": current_booking.end_date,
-                "guest_name": current_booking.guest_name
-            }
-            room_data.is_available = False
+            result.append(room_data)
 
-        # Get upcoming bookings
-        upcoming = db.query(Booking).filter(
-            Booking.room_id == room.id,
-            Booking.start_date > today
-        ).order_by(Booking.start_date).limit(5).all()
+        return result
 
-        room_data.upcoming_bookings = [
-            {
-                "id": b.id,
-                "start_date": b.start_date,
-                "end_date": b.end_date,
-                "guest_name": b.guest_name
-            } for b in upcoming
-        ]
-
-        result.append(room_data)
-
-    return result
+    except Exception as e:
+        print(f"[API] /rooms/list error: {e}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 
 @router.get("/{room_id}", response_model=Room)
