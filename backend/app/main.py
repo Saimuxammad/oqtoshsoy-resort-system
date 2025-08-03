@@ -1,16 +1,22 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
+import logging
 
 from .database import engine, get_db
 from .models import room, booking, user, history
 from .services.room_service import RoomService
 from .services.notification_service import notification_service
-from .api import rooms, bookings, auth, analytics, export, history as history_api, websocket
+from .api import rooms, bookings, auth, analytics, export, history as history_api
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create tables
 room.Base.metadata.create_all(bind=engine)
@@ -25,8 +31,12 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    db = next(get_db())
-    RoomService.initialize_rooms(db)
+    try:
+        db = next(get_db())
+        RoomService.initialize_rooms(db)
+        logger.info("Rooms initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing rooms: {e}")
 
     # Schedule daily report at 9:00 AM
     scheduler.add_job(
@@ -45,8 +55,11 @@ async def lifespan(app: FastAPI):
 
 async def send_daily_report():
     """Send daily report to admins"""
-    db = next(get_db())
-    await notification_service.send_daily_report(db)
+    try:
+        db = next(get_db())
+        await notification_service.send_daily_report(db)
+    except Exception as e:
+        logger.error(f"Error sending daily report: {e}")
 
 
 app = FastAPI(
@@ -54,33 +67,40 @@ app = FastAPI(
     version="2.0.0",
     description="Advanced hotel management system with real-time updates",
     lifespan=lifespan,
-    # ВАЖНО: Отключаем автоматическое добавление слешей
     redirect_slashes=False
 )
 
-# Configure CORS - ИСПРАВЛЕННАЯ ВЕРСИЯ
+# Настройка CORS - ПОЛНАЯ поддержка
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
         "https://oqtoshsoy-resort-system-production.up.railway.app",
         "http://localhost:5173",
-        "http://localhost:5174"
+        "http://localhost:5174",
+        "http://localhost:3000",
+        "*"  # Временно для отладки
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
+    max_age=3600
 )
 
-# Include routers
+# Добавляем middleware для доверенных хостов
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"]  # В production укажите конкретные домены
+)
+
+# Include routers с правильными префиксами
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
 app.include_router(bookings.router, prefix="/api/bookings", tags=["bookings"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(history_api.router, prefix="/api/history", tags=["history"])
-#app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 
 
 @app.get("/")
@@ -120,6 +140,26 @@ async def api_root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}
+
+
+# Обработчик для всех несуществующих маршрутов
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    logger.warning(f"404 Not Found: {request.url}")
+    return {
+        "detail": f"Path {request.url.path} not found",
+        "status_code": 404
+    }
+
+
+# Обработчик для внутренних ошибок сервера
+@app.exception_handler(500)
+async def internal_error_handler(request, exc):
+    logger.error(f"500 Internal Server Error: {exc}")
+    return {
+        "detail": "Internal server error",
+        "status_code": 500
+    }
 
 
 if __name__ == "__main__":

@@ -1,46 +1,57 @@
-import api from '../utils/api';
+import api from './api';
 
 export const roomService = {
-  // Получить список комнат с фильтрами
+  // Get all rooms - ИСПРАВЛЕНО: убран /list
   getRooms: async (filters = {}) => {
     try {
-      const params = {};
+      const params = new URLSearchParams();
+      if (filters.type) params.append('room_type', filters.type);
+      if (filters.status) params.append('status', filters.status);
 
-      if (filters.type) params.type = filters.type;
-      if (filters.available !== undefined) params.available = filters.available;
-
-      const response = await api.get('/rooms/list', {
-        params
-      });
-
-      console.log('[RoomService] Rooms loaded:', response.data);
+      const response = await api.get(`/rooms?${params}`);
+      console.log('Rooms loaded:', response.data);
       return response.data;
     } catch (error) {
-      console.error('[RoomService] getRooms error:', error);
+      console.error('getRooms error:', error);
       throw error;
     }
   },
 
-  // Получить одну комнату по ID
+  // Get single room
   getRoom: async (roomId) => {
     try {
       const response = await api.get(`/rooms/${roomId}`);
-      console.log('[RoomService] Room loaded:', response.data);
       return response.data;
     } catch (error) {
-      console.error('[RoomService] getRoom error:', error);
+      console.error('getRoom error:', error);
       throw error;
     }
   },
 
-  // Обновить данные комнаты
+  // Update room
   updateRoom: async (roomId, data) => {
     try {
+      console.log('Updating room:', roomId, data);
       const response = await api.patch(`/rooms/${roomId}`, data);
-      console.log('[RoomService] Room updated:', response.data);
+      console.log('Room updated:', response.data);
       return response.data;
     } catch (error) {
-      console.error('[RoomService] updateRoom error:', error);
+      console.error('updateRoom error:', error);
+      throw error;
+    }
+  },
+
+  // Get room availability
+  checkAvailability: async (roomId, startDate, endDate) => {
+    try {
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate
+      });
+      const response = await api.get(`/rooms/${roomId}/availability?${params}`);
+      return response.data;
+    } catch (error) {
+      console.error('checkAvailability error:', error);
       throw error;
     }
   }
