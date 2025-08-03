@@ -1,52 +1,44 @@
 import os
-from typing import List, Optional
-from pydantic_settings import BaseSettings
+from typing import Optional
 
+# Database
+DATABASE_URL: str = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./oqtoshsoy_resort.db"  # По умолчанию SQLite для разработки
+)
 
-class Settings(BaseSettings):
-    # Database
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "sqlite:///./oqtoshsoy_resort.db"
-    )
+# Если используется PostgreSQL от Railway, нужно заменить postgres:// на postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-    # Security
-    SECRET_KEY: str = os.getenv(
-        "SECRET_KEY",
-        "your-secret-key-here-change-in-production"
-    )
+# Telegram Bot
+TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_WEB_APP_SECRET: str = os.getenv("TELEGRAM_WEB_APP_SECRET", "WebAppData")
 
-    # Telegram
-    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    TELEGRAM_WEB_APP_SECRET: str = os.getenv("TELEGRAM_WEB_APP_SECRET", "WebAppData")
+# Security
+SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM: str = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    # Allowed Telegram IDs (comma-separated list in env)
-    ALLOWED_TELEGRAM_IDS: Optional[str] = os.getenv("ALLOWED_TELEGRAM_IDS", "")
+# Redis (optional)
+REDIS_URL: Optional[str] = os.getenv("REDIS_URL", None)
 
-    # Frontend
-    FRONTEND_URL: str = os.getenv(
-        "FRONTEND_URL",
-        "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app"
-    )
+# Environment
+ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+DEBUG: bool = ENVIRONMENT == "development"
 
-    # Redis (optional)
-    REDIS_URL: str = os.getenv("REDIS_URL", "")
+# CORS
+FRONTEND_URL: str = os.getenv(
+    "FRONTEND_URL",
+    "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app"
+)
 
-    # Environment
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
+# Application
+APP_NAME: str = "Oqtoshsoy Resort Management System"
+APP_VERSION: str = "2.0.0"
 
-    @property
-    def allowed_telegram_ids_list(self) -> List[int]:
-        """Convert comma-separated string to list of integers"""
-        if not self.ALLOWED_TELEGRAM_IDS:
-            return []
-        try:
-            return [int(id.strip()) for id in self.ALLOWED_TELEGRAM_IDS.split(",") if id.strip()]
-        except ValueError:
-            return []
+# Telegram IDs списки
+ALLOWED_TELEGRAM_IDS: list = os.getenv("ALLOWED_TELEGRAM_IDS", "").split(",") if os.getenv("ALLOWED_TELEGRAM_IDS") else []
 
-    class Config:
-        case_sensitive = True
-
-
-settings = Settings()
+# WebSocket
+WEB_APP_URL: str = os.getenv("WEB_APP_URL", FRONTEND_URL)
