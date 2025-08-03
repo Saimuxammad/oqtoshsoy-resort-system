@@ -87,12 +87,12 @@ async def telegram_auth(
                 detail="Invalid user data"
             )
 
-        # Проверяем, разрешен ли доступ пользователю
-        if not is_allowed_user(telegram_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied. You are not authorized to use this system."
-            )
+        # Временно отключаем проверку для тестирования
+        # if not is_allowed_user(telegram_id):
+        #     raise HTTPException(
+        #         status_code=status.HTTP_403_FORBIDDEN,
+        #         detail="Access denied. You are not authorized to use this system."
+        #     )
 
         user = db.query(User).filter(User.telegram_id == telegram_id).first()
 

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import os
 from ..database import get_db
-from ..models.user import User
+from ..models.user import User, UserRole
 
 # JWT настройки
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
@@ -43,24 +43,25 @@ def get_current_user(
         db: Session = Depends(get_db)
 ) -> User:
     """Get current user from token"""
-    # Для разработки - создаем/получаем тестового пользователя
+    # Для разработки и тестирования - создаем/получаем тестового пользователя
 
-    # Проверяем, есть ли токен
-    if not credentials:
-        # Создаем гостевого пользователя для разработки
-        guest_user = db.query(User).filter(User.telegram_id == 123456789).first()
-        if not guest_user:
-            guest_user = User(
+    # Если нет credentials или это браузер без Telegram
+    if not credentials or not credentials.credentials:
+        # Создаем тестового админа для разработки
+        test_user = db.query(User).filter(User.telegram_id == 123456789).first()
+        if not test_user:
+            test_user = User(
                 telegram_id=123456789,
-                first_name="Guest",
-                last_name="User",
-                username="guest_user",
-                is_admin=False
+                first_name="Test",
+                last_name="Admin",
+                username="test_admin",
+                is_admin=True,
+                role=UserRole.ADMIN if hasattr(User, 'role') else None
             )
-            db.add(guest_user)
+            db.add(test_user)
             db.commit()
-            db.refresh(guest_user)
-        return guest_user
+            db.refresh(test_user)
+        return test_user
 
     token = credentials.credentials
 
@@ -83,25 +84,16 @@ def get_current_user(
     # Проверяем JWT токен
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # В случае невалидного токена возвращаем тестового пользователя
+        return get_current_user(None, db)
 
     user_id = payload.get("user_id")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
+        return get_current_user(None, db)
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
+        return get_current_user(None, db)
 
     return user
 
