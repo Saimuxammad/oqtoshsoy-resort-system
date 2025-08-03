@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 import uvicorn
@@ -13,6 +14,7 @@ from .services.room_service import RoomService
 from .services.notification_service import notification_service
 from .api import rooms, bookings, auth, analytics, export, history as history_api, users  # websocket временно отключен
 
+app = FastAPI()
 # Create tables
 room.Base.metadata.create_all(bind=engine)
 
