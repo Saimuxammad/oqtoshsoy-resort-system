@@ -1,5 +1,3 @@
-import api from '../utils/api';
-
 export const roomService = {
   // Get all rooms
   getRooms: async (filters = {}) => {
@@ -8,11 +6,38 @@ export const roomService = {
       if (filters.type) params.append('type', filters.type);
       if (filters.available !== undefined) params.append('available', filters.available);
 
-      const response = await api.get(`/api/rooms?${params}`);
-      console.log('Rooms loaded:', response.data);
-      return response.data;
+      // Получаем токен
+      const token = localStorage.getItem('auth_token') ||
+                    sessionStorage.getItem('auth_token') ||
+                    'dev_token';
+
+      // Прямой URL без дублирования
+      const url = `https://oqtoshsoy-resort-system-production.up.railway.app/api/rooms?${params}`;
+      console.log('[RoomService] Fetching rooms from:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('[RoomService] Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[RoomService] Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('[RoomService] Rooms loaded:', data);
+      return data;
+
     } catch (error) {
-      console.error('getRooms error:', error);
+      console.error('[RoomService] getRooms error:', error);
       throw error;
     }
   },
@@ -20,10 +45,28 @@ export const roomService = {
   // Get single room
   getRoom: async (roomId) => {
     try {
-      const response = await api.get(`/api/rooms/${roomId}`);
-      return response.data;
+      const token = localStorage.getItem('auth_token') ||
+                    sessionStorage.getItem('auth_token') ||
+                    'dev_token';
+
+      const url = `https://oqtoshsoy-resort-system-production.up.railway.app/api/rooms/${roomId}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error('getRoom error:', error);
+      console.error('[RoomService] getRoom error:', error);
       throw error;
     }
   },
@@ -31,10 +74,29 @@ export const roomService = {
   // Update room
   updateRoom: async (roomId, data) => {
     try {
-      const response = await api.patch(`/api/rooms/${roomId}`, data);
-      return response.data;
+      const token = localStorage.getItem('auth_token') ||
+                    sessionStorage.getItem('auth_token') ||
+                    'dev_token';
+
+      const url = `https://oqtoshsoy-resort-system-production.up.railway.app/api/rooms/${roomId}`;
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error('updateRoom error:', error);
+      console.error('[RoomService] updateRoom error:', error);
       throw error;
     }
   }
