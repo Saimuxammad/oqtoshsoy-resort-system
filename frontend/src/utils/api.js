@@ -2,20 +2,20 @@ import axios from 'axios';
 
 // Определяем базовый URL для API
 const getBaseURL = () => {
-  // Backend URL на Railway
-  const BACKEND_URL = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
+  // Для Railway используем переменную окружения или прямой URL
+  const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://oqtoshsoy-resort-system-production.up.railway.app';
 
+  console.log('[API] Environment:', import.meta.env.MODE);
+  console.log('[API] VITE_API_URL:', import.meta.env.VITE_API_URL);
   console.log('[API] Using backend URL:', BACKEND_URL);
-  console.log('[API] Current location:', window.location.href);
-  console.log('[API] Is Telegram WebApp:', !!window.Telegram?.WebApp);
 
   // Для локальной разработки
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:8000/api';
   }
 
-  // Для production используем backend на Railway
-  return BACKEND_URL;
+  // Для production - добавляем /api к базовому URL
+  return `${BACKEND_URL}/api`;
 };
 
 const api = axios.create({
