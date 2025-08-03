@@ -12,7 +12,7 @@ export const roomService = {
                     'dev_token';
 
       // Прямой URL без дублирования
-      const url = `https://oqtoshsoy-resort-system-production.up.railway.app/api/rooms?${params}`;
+      const url = `https://oqtoshsoy-resort-system-production.up.railway.app/api/rooms/list?${params}`;
       console.log('[RoomService] Fetching rooms from:', url);
 
       const response = await fetch(url, {

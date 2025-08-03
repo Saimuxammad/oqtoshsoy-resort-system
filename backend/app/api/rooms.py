@@ -13,7 +13,7 @@ from ..utils.dependencies import get_current_user, require_admin
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Room])
+@router.get("/list", response_model=List[Room])
 async def get_rooms(
         skip: int = 0,
         limit: int = 100,
