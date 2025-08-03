@@ -1,125 +1,103 @@
 import axios from 'axios';
 
-// Определяем базовый URL для API
+// 🌐 Получаем базовый URL в зависимости от окружения
 const getBaseURL = () => {
-  // Для Railway используем переменную окружения или прямой URL
   const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://oqtoshsoy-resort-system-production.up.railway.app';
 
-  console.log('[API] Environment:', import.meta.env.MODE);
-  console.log('[API] VITE_API_URL:', import.meta.env.VITE_API_URL);
-  console.log('[API] Using backend URL:', BACKEND_URL);
+  const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
-  // Для локальной разработки
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
-  }
+  const finalBaseURL = isLocal
+    ? 'http://localhost:8000/api'
+    : `${BACKEND_URL}/api`;
 
-  // Для production - добавляем /api к базовому URL
-  return `${BACKEND_URL}/api`;
+  console.log('[API] Mode:', import.meta.env.MODE);
+  console.log('[API] Final baseURL:', finalBaseURL);
+
+  return finalBaseURL;
 };
 
+// 📦 Инициализация axios с параметрами
 const api = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
-  // Важно: не добавлять trailing slash автоматически
-  paramsSerializer: params => {
-    return Object.entries(params)
-      .map(([key, value]) => `${key}=${value}`)
-      .join('&');
-  }
+  paramsSerializer: params =>
+    new URLSearchParams(params).toString()
 });
 
-// Request interceptor для добавления токена
+// 🔒 Интерцептор запросов — авторизация + логирование
 api.interceptors.request.use(
-  (config) => {
-    // Получаем токен из localStorage или из Telegram WebApp
+  config => {
     const token = localStorage.getItem('auth_token') ||
                   sessionStorage.getItem('auth_token') ||
-                  'dev_token'; // Временный токен для разработки
+                  'dev_token';
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Логируем запросы для отладки
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, {
+    console.log(`[API] Request: ${config.method?.toUpperCase()} ${config.url}`, {
       baseURL: config.baseURL,
       headers: config.headers,
+      params: config.params,
       data: config.data
     });
 
     return config;
   },
-  (error) => {
+  error => {
     console.error('[API] Request error:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor для обработки ошибок
+// ⚠️ Интерцептор ответа — диагностика ошибок
 api.interceptors.response.use(
-  (response) => {
-    console.log(`[API] Response ${response.config.url}:`, response.data);
+  response => {
+    console.log(`[API] Response from ${response.config.url}:`, response.data);
     return response;
   },
-  (error) => {
+  error => {
     console.error('[API] Response error:', error);
 
     if (error.response) {
-      // Сервер ответил с ошибкой
-      console.error('[API] Error response:', {
-        status: error.response.status,
-        data: error.response.data,
-        headers: error.response.headers
-      });
+      const { status, data, headers } = error.response;
+      console.warn(`[API] Status ${status}`, { data, headers });
 
-      // Обработка специфических ошибок
-      switch (error.response.status) {
+      switch (status) {
         case 401:
-          // Не авторизован
-          console.warn('[API] Unauthorized - redirecting to auth...');
-          // Здесь можно добавить редирект на страницу авторизации
+          console.warn('[API] Unauthorized — maybe redirect to login');
           break;
         case 403:
-          console.warn('[API] Forbidden - insufficient permissions');
+          console.warn('[API] Forbidden — no access rights');
           break;
         case 404:
-          console.warn('[API] Not found');
+          console.warn('[API] Endpoint not found');
           break;
         case 500:
-          console.error('[API] Internal server error');
+          console.error('[API] Server error');
           break;
       }
     } else if (error.request) {
-      // Запрос был отправлен, но ответ не получен
-      console.error('[API] No response received:', error.request);
-
-      // Проверяем, является ли это CORS ошибкой
-      if (error.message === 'Network Error') {
-        console.error('[API] Possible CORS issue or server is down');
-      }
+      console.error('[API] No response received. Is server reachable?');
     } else {
-      // Что-то произошло при настройке запроса
-      console.error('[API] Request setup error:', error.message);
+      console.error('[API] Setup error:', error.message);
     }
 
     return Promise.reject(error);
   }
 );
 
-// Функция для обновления токена
+// 🔄 Функция для установки токена
 export const setAuthToken = (token) => {
-  if (token) {
-    localStorage.setItem('auth_token', token);
-    sessionStorage.setItem('auth_token', token);
-  } else {
-    localStorage.removeItem('auth_token');
-    sessionStorage.removeItem('auth_token');
-  }
+  const storage = [localStorage, sessionStorage];
+  storage.forEach(store => {
+    if (token) store.setItem('auth_token', token);
+    else store.removeItem('auth_token');
+  });
 };
 
-// Экспортируем настроенный экземпляр axios
+// 📤 Экспорт API
 export default api;
