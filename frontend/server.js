@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 // Proxy API requests to backend
 app.use('/api', createProxyMiddleware({
-  target: 'https://oqtoshsoy-resort-system-production.up.railway.app',
+  target: process.env.BACKEND_URL || 'https://oqtoshsoy-resort-backend.up.railway.app', // Замените на URL вашего backend
   changeOrigin: true,
   secure: true,
   logLevel: 'debug',
