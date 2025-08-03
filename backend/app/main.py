@@ -14,13 +14,16 @@ from .services.notification_service import notification_service
 from .api import rooms, bookings, auth, analytics, export, history as history_api, users  # websocket временно отключен
 
 # Create tables
-room.Base.metadata.create_all(bind=engine)app.add_middleware(
+room.Base.metadata.create_all(bind=engine)
+
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Можно также указать конкретный домен
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
 
 
 # Добавляем middleware для логирования всех запросов
