@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // Определяем базовый URL для API
 const getBaseURL = () => {
-  // ВАЖНО: Всегда используем прямой URL к backend без прокси
-  const BACKEND_URL = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
+  // ВАЖНО: URL уже должен содержать /api
+  const BACKEND_URL = 'https://oqtoshsoy-resort-system-production.up.railway.app';
 
   console.log('[API] Using backend URL:', BACKEND_URL);
   console.log('[API] Current location:', window.location.href);
@@ -11,7 +11,7 @@ const getBaseURL = () => {
 
   // Для локальной разработки
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
+    return 'http://localhost:8000';
   }
 
   // Для всех остальных случаев используем прямой URL

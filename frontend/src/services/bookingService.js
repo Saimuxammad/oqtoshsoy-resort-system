@@ -9,7 +9,7 @@ export const bookingService = {
       if (filters.startDate) params.append('start_date', filters.startDate);
       if (filters.endDate) params.append('end_date', filters.endDate);
 
-      const response = await api.get(`/bookings?${params}`);
+      const response = await api.get(`/api/bookings?${params}`);
       console.log('Bookings loaded:', response.data);
       return response.data;
     } catch (error) {
@@ -21,7 +21,7 @@ export const bookingService = {
   // Get single booking
   getBooking: async (bookingId) => {
     try {
-      const response = await api.get(`/bookings/${bookingId}`);
+      const response = await api.get(`/api/bookings/${bookingId}`);
       return response.data;
     } catch (error) {
       console.error('getBooking error:', error);
@@ -33,7 +33,7 @@ export const bookingService = {
   createBooking: async (booking) => {
     try {
       console.log('Creating booking:', booking);
-      const response = await api.post('/bookings', booking);
+      const response = await api.post('/api/bookings', booking);
       console.log('Booking created:', response.data);
       return response.data;
     } catch (error) {
@@ -53,8 +53,8 @@ export const bookingService = {
                     'dev_token';
 
       // Базовый URL
-      const baseUrl = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
-      const url = `${baseUrl}/bookings/${bookingId}`;
+      const baseUrl = 'https://oqtoshsoy-resort-system-production.up.railway.app';
+      const url = `${baseUrl}/api/bookings/${bookingId}`;
 
       console.log('[BookingService] UPDATE URL:', url);
       console.log('[BookingService] Update data:', data);

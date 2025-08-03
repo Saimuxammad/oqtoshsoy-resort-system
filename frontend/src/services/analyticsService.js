@@ -6,7 +6,7 @@ export const analyticsService = {
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0]
     });
-    const response = await api.get(`/analytics/occupancy?${params}`);
+    const response = await api.get(`/api/analytics/occupancy?${params}`);
     return response.data;
   },
 
@@ -15,22 +15,22 @@ export const analyticsService = {
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0]
     });
-    const response = await api.get(`/analytics/room-types?${params}`);
+    const response = await api.get(`/api/analytics/room-types?${params}`);
     return response.data;
   },
 
   getBookingTrends: async (months = 6) => {
-    const response = await api.get(`/analytics/trends?months=${months}`);
+    const response = await api.get(`/api/analytics/trends?months=${months}`);
     return response.data;
   },
 
   getUserActivity: async () => {
-    const response = await api.get('/analytics/users');
+    const response = await api.get('/api/analytics/users');
     return response.data;
   },
 
   getRevenueForecast: async (daysAhead = 30) => {
-    const response = await api.get(`/analytics/revenue-forecast?days_ahead=${daysAhead}`);
+    const response = await api.get(`/api/analytics/revenue-forecast?days_ahead=${daysAhead}`);
     return response.data;
   },
 
@@ -39,7 +39,7 @@ export const analyticsService = {
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0]
     });
-    const response = await api.get(`/export/analytics?${params}`, {
+    const response = await api.get(`/api/export/analytics?${params}`, {
       responseType: 'arraybuffer'
     });
     return response.data;

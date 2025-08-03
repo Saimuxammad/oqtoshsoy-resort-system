@@ -1,16 +1,15 @@
-import api from './api';
+import api from '../utils/api';
 
 export const roomService = {
   // Get all rooms
   getRooms: async (filters = {}) => {
-    console.log('Fetching rooms from:', api.defaults.baseURL);
-    const params = new URLSearchParams();
-    if (filters.roomType) params.append('room_type', filters.roomType);
-    if (filters.isAvailable !== undefined) params.append('is_available', filters.isAvailable);
-
     try {
-      const response = await api.get(`/rooms?${params}`);
-      console.log('Rooms response:', response.data);
+      const params = new URLSearchParams();
+      if (filters.type) params.append('type', filters.type);
+      if (filters.available !== undefined) params.append('available', filters.available);
+
+      const response = await api.get(`/api/rooms?${params}`);
+      console.log('Rooms loaded:', response.data);
       return response.data;
     } catch (error) {
       console.error('getRooms error:', error);
@@ -20,23 +19,23 @@ export const roomService = {
 
   // Get single room
   getRoom: async (roomId) => {
-    const response = await api.get(`/rooms/${roomId}`);
-    return response.data;
-  },
-
-  // Check room availability
-  checkAvailability: async (roomId, startDate, endDate) => {
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate
-    });
-    const response = await api.get(`/rooms/${roomId}/availability?${params}`);
-    return response.data;
+    try {
+      const response = await api.get(`/api/rooms/${roomId}`);
+      return response.data;
+    } catch (error) {
+      console.error('getRoom error:', error);
+      throw error;
+    }
   },
 
   // Update room
   updateRoom: async (roomId, data) => {
-    const response = await api.patch(`/rooms/${roomId}`, data);
-    return response.data;
+    try {
+      const response = await api.patch(`/api/rooms/${roomId}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('updateRoom error:', error);
+      throw error;
+    }
   }
 };

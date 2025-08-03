@@ -7,7 +7,7 @@ export const authService = {
 
       // Для Telegram WebApp
       if (initData) {
-        const response = await api.post('/auth/telegram', { initData });
+        const response = await api.post('/api/auth/telegram', { initData });
         const { token, user } = response.data;
 
         // Сохраняем токен
