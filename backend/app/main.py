@@ -14,60 +14,12 @@ from .services.notification_service import notification_service
 from .api import rooms, bookings, auth, analytics, export, history as history_api, users  # websocket временно отключен
 
 # Create tables
-room.Base.metadata.create_all(bind=engine)
-booking.Base.metadata.create_all(bind=engine)
-user.Base.metadata.create_all(bind=engine)
-history.Base.metadata.create_all(bind=engine)
-
-# Create scheduler for daily reports
-scheduler = AsyncIOScheduler()
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    db = next(get_db())
-    RoomService.initialize_rooms(db)
-
-    # Schedule daily report at 9:00 AM
-    scheduler.add_job(
-        send_daily_report,
-        'cron',
-        hour=9,
-        minute=0,
-        id='daily_report'
-    )
-    scheduler.start()
-
-    yield
-    # Shutdown
-    scheduler.shutdown()
-
-
-async def send_daily_report():
-    """Send daily report to admins"""
-    db = next(get_db())
-    await notification_service.send_daily_report(db)
-
-
-app = FastAPI(
-    title="Oqtoshsoy Resort Management API",
-    version="2.0.0",
-    description="Advanced hotel management system with real-time updates",
-    lifespan=lifespan,
-    # ВАЖНО: Отключаем автоматическое добавление слешей
-    redirect_slashes=False
-)
-
-# Configure CORS - ИСПРАВЛЕННАЯ КОНФИГУРАЦИЯ
-app.add_middleware(
+room.Base.metadata.create_all(bind=engine)app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Разрешаем все источники для упрощения
+    allow_origins=["*"],  # Можно также указать конкретный домен
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,
+    allow_headers=["*"]
 )
 
 
