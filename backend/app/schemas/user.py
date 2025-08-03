@@ -28,6 +28,29 @@ class User(UserBase):
         from_attributes = True
 
 
+class UserResponse(BaseModel):
+    id: int
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+    last_name: Optional[str] = None
+    is_admin: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TelegramAuthData(BaseModel):
+    id: int
+    first_name: str
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    auth_date: int
+    hash: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
