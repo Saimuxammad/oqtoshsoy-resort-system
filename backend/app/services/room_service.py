@@ -3,106 +3,90 @@ from typing import List, Optional
 from datetime import date
 from ..models.room import Room, RoomType
 from ..models.booking import Booking
-from ..schemas.room import RoomCreate, RoomUpdate
 
 
 class RoomService:
     @staticmethod
-    def create_room(db: Session, room: RoomCreate) -> Room:
-        db_room = Room(**room.dict())
-        db.add(db_room)
-        db.commit()
-        db.refresh(db_room)
-        return db_room
+    def initialize_rooms(db: Session):
+        """Initialize rooms with default data if empty"""
+        if db.query(Room).count() > 0:
+            return
 
-    @staticmethod
-    def get_rooms(db: Session, skip: int = 0, limit: int = 100) -> List[Room]:
-        return db.query(Room).offset(skip).limit(limit).all()
+        rooms_data = [
+            # 2 o'rinli standart
+            {"room_number": "101", "room_type": RoomType.STANDARD_DOUBLE, "capacity": 2, "price_per_night": 500000},
+            {"room_number": "102", "room_type": RoomType.STANDARD_DOUBLE, "capacity": 2, "price_per_night": 500000},
+            {"room_number": "103", "room_type": RoomType.STANDARD_DOUBLE, "capacity": 2, "price_per_night": 500000},
+            {"room_number": "104", "room_type": RoomType.STANDARD_DOUBLE, "capacity": 2, "price_per_night": 500000},
+
+            # 4 o'rinli standart
+            {"room_number": "201", "room_type": RoomType.STANDARD_QUAD, "capacity": 4, "price_per_night": 700000},
+            {"room_number": "202", "room_type": RoomType.STANDARD_QUAD, "capacity": 4, "price_per_night": 700000},
+            {"room_number": "203", "room_type": RoomType.STANDARD_QUAD, "capacity": 4, "price_per_night": 700000},
+
+            # 2 o'rinli lyuks
+            {"room_number": "301", "room_type": RoomType.LUX_DOUBLE, "capacity": 2, "price_per_night": 800000},
+            {"room_number": "302", "room_type": RoomType.LUX_DOUBLE, "capacity": 2, "price_per_night": 800000},
+
+            # 4 o'rinli kichik VIP
+            {"room_number": "401", "room_type": RoomType.VIP_SMALL, "capacity": 4, "price_per_night": 1000000},
+            {"room_number": "402", "room_type": RoomType.VIP_SMALL, "capacity": 4, "price_per_night": 1000000},
+
+            # 4 o'rinli katta VIP
+            {"room_number": "501", "room_type": RoomType.VIP_LARGE, "capacity": 4, "price_per_night": 1200000},
+
+            # 4 o'rinli apartament
+            {"room_number": "601", "room_type": RoomType.APARTMENT, "capacity": 4, "price_per_night": 1500000},
+
+            # Kottedj
+            {"room_number": "701", "room_type": RoomType.COTTAGE, "capacity": 6, "price_per_night": 2000000},
+
+            # Prezident apartamenti
+            {"room_number": "801", "room_type": RoomType.PRESIDENT, "capacity": 8, "price_per_night": 3000000},
+        ]
+
+        for room_data in rooms_data:
+            room = Room(**room_data)
+            db.add(room)
+
+        db.commit()
 
     @staticmethod
     def get_room(db: Session, room_id: int) -> Optional[Room]:
         return db.query(Room).filter(Room.id == room_id).first()
 
     @staticmethod
-    def get_room_by_number(db: Session, room_number: str) -> Optional[Room]:
-        return db.query(Room).filter(Room.room_number == room_number).first()
+    def get_rooms(db: Session, skip: int = 0, limit: int = 100) -> List[Room]:
+        return db.query(Room).offset(skip).limit(limit).all()
 
     @staticmethod
-    def update_room(db: Session, room_id: int, room_update: RoomUpdate) -> Optional[Room]:
+    def update_room(db: Session, room_id: int, room_update: dict) -> Optional[Room]:
         room = db.query(Room).filter(Room.id == room_id).first()
         if room:
-            update_data = room_update.dict(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(room, field, value)
+            for key, value in room_update.dict(exclude_unset=True).items():
+                setattr(room, key, value)
             db.commit()
             db.refresh(room)
         return room
 
     @staticmethod
-    def get_room_availability(db: Session, room_id: int, check_date: date) -> bool:
+    def is_room_available(db: Session, room_id: int, start_date: date, end_date: date) -> bool:
         bookings = db.query(Booking).filter(
             Booking.room_id == room_id,
-            Booking.start_date <= check_date,
-            Booking.end_date >= check_date
+            Booking.start_date <= end_date,
+            Booking.end_date >= start_date
         ).count()
         return bookings == 0
 
     @staticmethod
-    def initialize_rooms(db: Session):
-        """Initialize all rooms in the database"""
-        rooms_data = [
-            # 2 o'rinli standart
-            {"room_number": "21", "room_type": RoomType.STANDARD_2},
-            {"room_number": "22", "room_type": RoomType.STANDARD_2},
-            {"room_number": "23", "room_type": RoomType.STANDARD_2},
-            {"room_number": "24", "room_type": RoomType.STANDARD_2},
-            {"room_number": "25", "room_type": RoomType.STANDARD_2},
-            {"room_number": "26", "room_type": RoomType.STANDARD_2},
-            {"room_number": "27", "room_type": RoomType.STANDARD_2},
-            {"room_number": "28", "room_type": RoomType.STANDARD_2},
+    def get_room_bookings(db: Session, room_id: int, start_date: Optional[date] = None,
+                          end_date: Optional[date] = None) -> List[Booking]:
+        query = db.query(Booking).filter(Booking.room_id == room_id)
 
-            # 4 o'rinli standart
-            {"room_number": "29", "room_type": RoomType.STANDARD_4},
+        if start_date:
+            query = query.filter(Booking.end_date >= start_date)
 
-            # 2 o'rinli lyuks
-            {"room_number": "101", "room_type": RoomType.LUX_2},
-            {"room_number": "202", "room_type": RoomType.LUX_2},
-            {"room_number": "302", "room_type": RoomType.LUX_2},
-            {"room_number": "401", "room_type": RoomType.LUX_2},
-            {"room_number": "402", "room_type": RoomType.LUX_2},
-            {"room_number": "503", "room_type": RoomType.LUX_2},
-            {"room_number": "703", "room_type": RoomType.LUX_2},
-            {"room_number": "704", "room_type": RoomType.LUX_2},
-            {"room_number": "705", "room_type": RoomType.LUX_2},
-            {"room_number": "706", "room_type": RoomType.LUX_2},
+        if end_date:
+            query = query.filter(Booking.start_date <= end_date)
 
-            # 4 o'rinli kichik VIP
-            {"room_number": "502", "room_type": RoomType.VIP_SMALL_4},
-            {"room_number": "702", "room_type": RoomType.VIP_SMALL_4},
-
-            # 4 o'rinli katta VIP
-            {"room_number": "102", "room_type": RoomType.VIP_BIG_4},
-            {"room_number": "103", "room_type": RoomType.VIP_BIG_4},
-            {"room_number": "701", "room_type": RoomType.VIP_BIG_4},
-
-            # 4 o'rinli apartament
-            {"room_number": "201", "room_type": RoomType.APARTMENT_4},
-            {"room_number": "301", "room_type": RoomType.APARTMENT_4},
-            {"room_number": "504", "room_type": RoomType.APARTMENT_4},  # Изменил с 503 на 504
-            {"room_number": "601", "room_type": RoomType.APARTMENT_4},
-            {"room_number": "602", "room_type": RoomType.APARTMENT_4},
-
-            # Kottedj
-            {"room_number": "Kottedj", "room_type": RoomType.COTTAGE_6},
-
-            # Prezident apartamenti
-            {"room_number": "707", "room_type": RoomType.PRESIDENT_8},
-        ]
-
-        for room_data in rooms_data:
-            existing = db.query(Room).filter(Room.room_number == room_data["room_number"]).first()
-            if not existing:
-                new_room = Room(**room_data)
-                db.add(new_room)
-
-        db.commit()
+        return query.order_by(Booking.start_date).all()
