@@ -164,6 +164,24 @@ async def test_database(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/init-rooms")
+async def init_rooms(db: Session = Depends(get_db)):
+    """Initialize rooms in database"""
+    try:
+        from .models.room import Room
+        # Проверяем, есть ли уже комнаты
+        count = db.query(Room).count()
+        if count > 0:
+            return {"status": "already_initialized", "rooms_count": count}
+
+        # Инициализируем комнаты
+        RoomService.initialize_rooms(db)
+        new_count = db.query(Room).count()
+        return {"status": "initialized", "rooms_count": new_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}
