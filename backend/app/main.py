@@ -10,6 +10,8 @@ import logging
 import os
 
 from .database import engine, get_db
+
+from .database import engine, get_db
 from .models import room, booking, user, history
 from .services.room_service import RoomService
 from .services.notification_service import notification_service
@@ -87,10 +89,12 @@ if frontend_url and frontend_url not in origins:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600
 )
 
 # Добавляем middleware для доверенных хостов
@@ -140,6 +144,24 @@ async def api_root():
             "history": "/api/history"
         }
     }
+
+
+@app.get("/api/test")
+async def test_endpoint():
+    """Test endpoint to check if API is working"""
+    return {"status": "ok", "message": "API is working"}
+
+
+@app.get("/api/test-db")
+async def test_database(db: Session = Depends(get_db)):
+    """Test database connection"""
+    try:
+        # Попробуем подсчитать количество комнат
+        from .models.room import Room
+        count = db.query(Room).count()
+        return {"status": "ok", "rooms_count": count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.get("/health")
