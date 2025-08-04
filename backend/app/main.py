@@ -221,30 +221,69 @@ async def fix_capacity(db: Session = Depends(get_db)):
             db.execute(text("ALTER TABLE rooms ADD COLUMN capacity INTEGER DEFAULT 2"))
             db.commit()
 
-            # Обновляем значения
+            # Обновляем значения используя ENUM имена
             capacity_map = {
-                "2 o'rinli standart": 2,
-                "4 o'rinli standart": 4,
-                "2 o'rinli lyuks": 2,
-                "4 o'rinli kichik VIP": 4,
-                "4 o'rinli katta VIP": 4,
-                "4 o'rinli apartament": 4,
-                "Kottedj (6 kishi uchun)": 6,
-                "Prezident apartamenti (8 kishi uchun)": 8
+                "STANDARD_DOUBLE": 2,
+                "STANDARD_QUAD": 4,
+                "LUX_DOUBLE": 2,
+                "VIP_SMALL": 4,
+                "VIP_LARGE": 4,
+                "APARTMENT": 4,
+                "COTTAGE": 6,
+                "PRESIDENT": 8
             }
 
             for room_type, capacity in capacity_map.items():
                 db.execute(
-                    text("UPDATE rooms SET capacity = :capacity WHERE room_type = :room_type"),
-                    {"capacity": capacity, "room_type": room_type}
+                    text(f"UPDATE rooms SET capacity = :capacity WHERE room_type = '{room_type}'"),
+                    {"capacity": capacity}
                 )
             db.commit()
             return {"status": "fixed", "message": "Capacity column added"}
         else:
-            return {"status": "already_exists", "message": "Capacity column already exists"}
+            # Если колонка уже есть, просто обновим значения
+            db.execute(text("UPDATE rooms SET capacity = 2 WHERE capacity IS NULL"))
+            db.commit()
+            return {"status": "updated", "message": "Set default capacity for null values"}
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/rooms-simple")
+async def get_rooms_simple(db: Session = Depends(get_db)):
+    """Simple endpoint to get rooms without complex serialization"""
+    try:
+        from .models.room import Room
+        rooms = db.query(Room).all()
+        result = []
+
+        for room in rooms:
+            # Получаем capacity безопасно
+            capacity = 2  # значение по умолчанию
+            if hasattr(room, 'capacity') and room.capacity is not None:
+                capacity = room.capacity
+
+            # Обрабатываем room_type
+            if hasattr(room.room_type, 'value'):
+                room_type_str = room.room_type.value
+            else:
+                room_type_str = str(room.room_type)
+
+            result.append({
+                "id": room.id,
+                "room_number": room.room_number,
+                "room_type": room_type_str,
+                "capacity": capacity,
+                "price_per_night": float(room.price_per_night) if room.price_per_night else 0,
+                "description": room.description or "",
+                "amenities": room.amenities or "",
+                "is_available": True
+            })
+
+        return result
+    except Exception as e:
+        return {"error": str(e), "type": str(type(e))}
 
 
 @app.get("/health")

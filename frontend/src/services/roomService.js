@@ -1,19 +1,28 @@
 import api from './api';
 
 export const roomService = {
-  // Get all rooms - ИСПРАВЛЕНО: убран /list
+  // Get all rooms - Временно используем простой эндпоинт
   getRooms: async (filters = {}) => {
     try {
-      const params = new URLSearchParams();
-      if (filters.type) params.append('room_type', filters.type);
-      if (filters.status) params.append('status', filters.status);
-
-      const response = await api.get(`/rooms?${params}`);
+      // Временно используем упрощенный эндпоинт
+      const response = await api.get('/rooms-simple');
       console.log('Rooms loaded:', response.data);
       return response.data;
     } catch (error) {
       console.error('getRooms error:', error);
-      throw error;
+      // Если простой эндпоинт не работает, пробуем обычный
+      try {
+        const params = new URLSearchParams();
+        if (filters.type) params.append('room_type', filters.type);
+        if (filters.status) params.append('status', filters.status);
+
+        const response = await api.get(`/rooms?${params}`);
+        console.log('Rooms loaded from standard endpoint:', response.data);
+        return response.data;
+      } catch (secondError) {
+        console.error('Both endpoints failed:', secondError);
+        throw secondError;
+      }
     }
   },
 
