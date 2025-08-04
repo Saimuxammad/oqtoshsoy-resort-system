@@ -202,88 +202,97 @@ async def init_rooms(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/api/fix-capacity")
-async def fix_capacity(db: Session = Depends(get_db)):
-    """Fix capacity field in rooms"""
+@app.get("/api/fix-database")
+async def fix_database(db: Session = Depends(get_db)):
+    """Fix all missing columns in rooms table"""
     try:
         from sqlalchemy import text
 
-        # Проверяем, есть ли колонка capacity
-        result = db.execute(text("""
-                                 SELECT column_name
-                                 FROM information_schema.columns
-                                 WHERE table_name = 'rooms'
-                                   AND column_name = 'capacity'
-                                 """))
+        # Список колонок, которые должны быть в таблице
+        required_columns = {
+            'capacity': 'INTEGER DEFAULT 2',
+            'price_per_night': 'FLOAT DEFAULT 500000',
+            'description': 'TEXT',
+            'amenities': 'TEXT',
+            'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+        }
 
-        if result.fetchone() is None:
-            # Добавляем колонку
-            db.execute(text("ALTER TABLE rooms ADD COLUMN capacity INTEGER DEFAULT 2"))
-            db.commit()
+        added_columns = []
 
-            # Обновляем значения используя ENUM имена
-            capacity_map = {
-                "STANDARD_DOUBLE": 2,
-                "STANDARD_QUAD": 4,
-                "LUX_DOUBLE": 2,
-                "VIP_SMALL": 4,
-                "VIP_LARGE": 4,
-                "APARTMENT": 4,
-                "COTTAGE": 6,
-                "PRESIDENT": 8
-            }
+        for column_name, column_type in required_columns.items():
+            # Проверяем, существует ли колонка
+            result = db.execute(text(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='rooms' AND column_name='{column_name}'
+            """))
 
-            for room_type, capacity in capacity_map.items():
-                db.execute(
-                    text(f"UPDATE rooms SET capacity = :capacity WHERE room_type = '{room_type}'"),
-                    {"capacity": capacity}
-                )
-            db.commit()
-            return {"status": "fixed", "message": "Capacity column added"}
-        else:
-            # Если колонка уже есть, просто обновим значения
-            db.execute(text("UPDATE rooms SET capacity = 2 WHERE capacity IS NULL"))
-            db.commit()
-            return {"status": "updated", "message": "Set default capacity for null values"}
+            if result.fetchone() is None:
+                # Добавляем колонку
+                db.execute(text(f"ALTER TABLE rooms ADD COLUMN {column_name} {column_type}"))
+                db.commit()
+                added_columns.append(column_name)
+
+        # Устанавливаем цены по умолчанию для разных типов комнат
+        price_map = {
+            "STANDARD_DOUBLE": 500000,
+            "STANDARD_QUAD": 700000,
+            "LUX_DOUBLE": 800000,
+            "VIP_SMALL": 1000000,
+            "VIP_LARGE": 1200000,
+            "APARTMENT": 1500000,
+            "COTTAGE": 2000000,
+            "PRESIDENT": 3000000
+        }
+
+        for room_type, price in price_map.items():
+            db.execute(
+                text(
+                    f"UPDATE rooms SET price_per_night = :price WHERE room_type = '{room_type}' AND price_per_night IS NULL"),
+                {"price": price}
+            )
+        db.commit()
+
+        return {
+            "status": "success",
+            "added_columns": added_columns,
+            "message": f"Added {len(added_columns)} columns"
+        }
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/api/rooms-simple")
-async def get_rooms_simple(db: Session = Depends(get_db)):
-    """Simple endpoint to get rooms without complex serialization"""
+@app.get("/api/rooms-raw")
+async def get_rooms_raw(db: Session = Depends(get_db)):
+    """Get raw room data directly from database"""
     try:
-        from .models.room import Room
-        rooms = db.query(Room).all()
-        result = []
+        from sqlalchemy import text
 
-        for room in rooms:
-            # Получаем capacity безопасно
-            capacity = 2  # значение по умолчанию
-            if hasattr(room, 'capacity') and room.capacity is not None:
-                capacity = room.capacity
+        # Прямой SQL запрос для получения данных
+        result = db.execute(text("""
+                                 SELECT id, room_number, room_type::text as room_type
+                                 FROM rooms
+                                 ORDER BY id
+                                 """))
 
-            # Обрабатываем room_type
-            if hasattr(room.room_type, 'value'):
-                room_type_str = room.room_type.value
-            else:
-                room_type_str = str(room.room_type)
-
-            result.append({
-                "id": room.id,
-                "room_number": room.room_number,
-                "room_type": room_type_str,
-                "capacity": capacity,
-                "price_per_night": float(room.price_per_night) if room.price_per_night else 0,
-                "description": room.description or "",
-                "amenities": room.amenities or "",
+        rooms = []
+        for row in result:
+            rooms.append({
+                "id": row.id,
+                "room_number": row.room_number,
+                "room_type": row.room_type,
+                "capacity": 2,  # значение по умолчанию
+                "price_per_night": 500000,  # значение по умолчанию
+                "description": "",
+                "amenities": "",
                 "is_available": True
             })
 
-        return result
+        return rooms
     except Exception as e:
-        return {"error": str(e), "type": str(type(e))}
+        return {"error": str(e)}
 
 
 @app.get("/health")

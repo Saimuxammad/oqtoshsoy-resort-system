@@ -1,28 +1,37 @@
 import api from './api';
 
 export const roomService = {
-  // Get all rooms - Временно используем простой эндпоинт
+  // Get all rooms - Используем raw эндпоинт для обхода проблем с моделями
   getRooms: async (filters = {}) => {
     try {
-      // Временно используем упрощенный эндпоинт
-      const response = await api.get('/rooms-simple');
-      console.log('Rooms loaded:', response.data);
+      // Сначала пробуем raw эндпоинт
+      const response = await api.get('/rooms-raw');
+      console.log('Rooms loaded from raw endpoint:', response.data);
+
+      // Преобразуем ENUM значения в читаемые
+      const roomTypeMap = {
+        'STANDARD_DOUBLE': "2 o'rinli standart",
+        'STANDARD_QUAD': "4 o'rinli standart",
+        'LUX_DOUBLE': "2 o'rinli lyuks",
+        'VIP_SMALL': "4 o'rinli kichik VIP",
+        'VIP_LARGE': "4 o'rinli katta VIP",
+        'APARTMENT': "4 o'rinli apartament",
+        'COTTAGE': "Kottedj (6 kishi uchun)",
+        'PRESIDENT': "Prezident apartamenti (8 kishi uchun)"
+      };
+
+      if (Array.isArray(response.data)) {
+        return response.data.map(room => ({
+          ...room,
+          room_type: roomTypeMap[room.room_type] || room.room_type
+        }));
+      }
+
       return response.data;
     } catch (error) {
       console.error('getRooms error:', error);
-      // Если простой эндпоинт не работает, пробуем обычный
-      try {
-        const params = new URLSearchParams();
-        if (filters.type) params.append('room_type', filters.type);
-        if (filters.status) params.append('status', filters.status);
-
-        const response = await api.get(`/rooms?${params}`);
-        console.log('Rooms loaded from standard endpoint:', response.data);
-        return response.data;
-      } catch (secondError) {
-        console.error('Both endpoints failed:', secondError);
-        throw secondError;
-      }
+      // Возвращаем пустой массив при ошибке
+      return [];
     }
   },
 
