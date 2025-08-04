@@ -7,6 +7,7 @@ import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
 import logging
+import os
 
 from .database import engine, get_db
 from .models import room, booking, user, history
@@ -71,16 +72,22 @@ app = FastAPI(
 )
 
 # Настройка CORS - ПОЛНАЯ поддержка
+origins = [
+    "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
+    "https://oqtoshsoy-resort-system-production.up.railway.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000"
+]
+
+# Добавляем frontend URL из переменной окружения
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url and frontend_url not in origins:
+    origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://oqtoshsoy-resort-system-production-ef7c.up.railway.app",
-        "https://oqtoshsoy-resort-system-production.up.railway.app",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "*"  # Временно для отладки
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
