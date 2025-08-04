@@ -164,6 +164,26 @@ async def test_database(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/test-room")
+async def test_room(db: Session = Depends(get_db)):
+    """Test getting one room"""
+    try:
+        from .models.room import Room
+        room = db.query(Room).first()
+        if room:
+            return {
+                "id": room.id,
+                "room_number": room.room_number,
+                "room_type": str(room.room_type),
+                "room_type_value": room.room_type.value if hasattr(room.room_type, 'value') else None,
+                "capacity": room.capacity,
+                "price": float(room.price_per_night) if room.price_per_night else 0
+            }
+        return {"status": "no_rooms"}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "type": str(type(e))}
+
+
 @app.get("/api/init-rooms")
 async def init_rooms(db: Session = Depends(get_db)):
     """Initialize rooms in database"""
