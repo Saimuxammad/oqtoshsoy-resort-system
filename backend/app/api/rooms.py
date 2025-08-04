@@ -21,27 +21,35 @@ async def get_rooms(
         db: Session = Depends(get_db)
 ):
     """Get all rooms with optional filters"""
-    query = db.query(RoomModel)
+    try:
+        query = db.query(RoomModel)
 
-    if room_type:
-        query = query.filter(RoomModel.room_type == room_type)
+        if room_type:
+            query = query.filter(RoomModel.room_type == room_type)
 
-    if status:
-        # Фильтруем по текущей занятости
-        if status == "available":
-            # Здесь нужна более сложная логика для проверки доступности
-            pass
-        elif status == "occupied":
-            # Здесь нужна более сложная логика для проверки занятости
-            pass
+        rooms = query.offset(skip).limit(limit).all()
 
-    rooms = query.offset(skip).limit(limit).all()
+        # Преобразуем в схему и добавляем информацию о доступности
+        result = []
+        for room in rooms:
+            room_dict = {
+                "id": room.id,
+                "room_number": room.room_number,
+                "room_type": room.room_type.value if hasattr(room.room_type, 'value') else room.room_type,
+                "capacity": room.capacity,
+                "price_per_night": room.price_per_night,
+                "description": room.description,
+                "amenities": room.amenities,
+                "created_at": room.created_at,
+                "updated_at": room.updated_at,
+                "is_available": RoomService.is_room_available(db, room.id, date.today(), date.today())
+            }
+            result.append(room_dict)
 
-    # Добавляем информацию о текущем статусе для каждой комнаты
-    for room in rooms:
-        room.is_available = RoomService.is_room_available(db, room.id, date.today(), date.today())
-
-    return rooms
+        return result
+    except Exception as e:
+        print(f"Error in get_rooms: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{room_id}", response_model=Room)

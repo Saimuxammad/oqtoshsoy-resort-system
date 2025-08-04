@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime
 from enum import Enum
 
@@ -12,7 +12,7 @@ class RoomStatus(str, Enum):
 
 class RoomBase(BaseModel):
     room_number: str
-    room_type: str
+    room_type: Any  # Изменено на Any для поддержки enum
     capacity: int
     price_per_night: float
     description: Optional[str] = None
@@ -33,8 +33,9 @@ class Room(RoomBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    is_available: Optional[bool] = None
+    is_available: Optional[bool] = True  # Значение по умолчанию
     current_booking: Optional[dict] = None
 
     class Config:
         from_attributes = True
+        arbitrary_types_allowed = True  # Разрешаем произвольные типы
