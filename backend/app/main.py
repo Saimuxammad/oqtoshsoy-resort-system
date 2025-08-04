@@ -202,6 +202,51 @@ async def init_rooms(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/fix-capacity")
+async def fix_capacity(db: Session = Depends(get_db)):
+    """Fix capacity field in rooms"""
+    try:
+        from sqlalchemy import text
+
+        # Проверяем, есть ли колонка capacity
+        result = db.execute(text("""
+                                 SELECT column_name
+                                 FROM information_schema.columns
+                                 WHERE table_name = 'rooms'
+                                   AND column_name = 'capacity'
+                                 """))
+
+        if result.fetchone() is None:
+            # Добавляем колонку
+            db.execute(text("ALTER TABLE rooms ADD COLUMN capacity INTEGER DEFAULT 2"))
+            db.commit()
+
+            # Обновляем значения
+            capacity_map = {
+                "2 o'rinli standart": 2,
+                "4 o'rinli standart": 4,
+                "2 o'rinli lyuks": 2,
+                "4 o'rinli kichik VIP": 4,
+                "4 o'rinli katta VIP": 4,
+                "4 o'rinli apartament": 4,
+                "Kottedj (6 kishi uchun)": 6,
+                "Prezident apartamenti (8 kishi uchun)": 8
+            }
+
+            for room_type, capacity in capacity_map.items():
+                db.execute(
+                    text("UPDATE rooms SET capacity = :capacity WHERE room_type = :room_type"),
+                    {"capacity": capacity, "room_type": room_type}
+                )
+            db.commit()
+            return {"status": "fixed", "message": "Capacity column added"}
+        else:
+            return {"status": "already_exists", "message": "Capacity column already exists"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}

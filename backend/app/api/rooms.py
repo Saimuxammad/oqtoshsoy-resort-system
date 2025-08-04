@@ -43,7 +43,7 @@ async def get_rooms(
                 "id": room.id,
                 "room_number": room.room_number,
                 "room_type": room_type_str,
-                "capacity": room.capacity,
+                "capacity": getattr(room, 'capacity', 2),  # Безопасное получение capacity
                 "price_per_night": float(room.price_per_night) if room.price_per_night else 0,
                 "description": room.description if room.description else "",
                 "amenities": room.amenities if room.amenities else "",
