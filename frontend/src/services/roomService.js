@@ -8,22 +8,48 @@ export const roomService = {
       const response = await api.get('/rooms-raw');
       console.log('Rooms loaded from raw endpoint:', response.data);
 
-      // Преобразуем ENUM значения в читаемые
+      // Преобразуем ENUM значения в читаемые (обновленный маппинг)
       const roomTypeMap = {
-        'STANDARD_DOUBLE': "2 o'rinli standart",
-        'STANDARD_QUAD': "4 o'rinli standart",
-        'LUX_DOUBLE': "2 o'rinli lyuks",
-        'VIP_SMALL': "4 o'rinli kichik VIP",
-        'VIP_LARGE': "4 o'rinli katta VIP",
-        'APARTMENT': "4 o'rinli apartament",
-        'COTTAGE': "Kottedj (6 kishi uchun)",
-        'PRESIDENT': "Prezident apartamenti (8 kishi uchun)"
+        'STANDARD_2': "2 o'rinli standart",
+        'STANDARD_4': "4 o'rinli standart",
+        'LUX_2': "2 o'rinli lyuks",
+        'VIP_SMALL_4': "4 o'rinli kichik VIP",
+        'VIP_BIG_4': "4 o'rinli katta VIP",
+        'APARTMENT_4': "4 o'rinli apartament",
+        'COTTAGE_6': "Kottedj (6 kishi uchun)",
+        'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
+      };
+
+      // Обновляем capacity на основе типа комнаты
+      const capacityMap = {
+        'STANDARD_2': 2,
+        'STANDARD_4': 4,
+        'LUX_2': 2,
+        'VIP_SMALL_4': 4,
+        'VIP_BIG_4': 4,
+        'APARTMENT_4': 4,
+        'COTTAGE_6': 6,
+        'PRESIDENT_8': 8
+      };
+
+      // Обновляем цены на основе типа комнаты
+      const priceMap = {
+        'STANDARD_2': 500000,
+        'STANDARD_4': 700000,
+        'LUX_2': 800000,
+        'VIP_SMALL_4': 1000000,
+        'VIP_BIG_4': 1200000,
+        'APARTMENT_4': 1500000,
+        'COTTAGE_6': 2000000,
+        'PRESIDENT_8': 3000000
       };
 
       if (Array.isArray(response.data)) {
         return response.data.map(room => ({
           ...room,
-          room_type: roomTypeMap[room.room_type] || room.room_type
+          room_type: roomTypeMap[room.room_type] || room.room_type,
+          capacity: capacityMap[room.room_type] || room.capacity,
+          price_per_night: priceMap[room.room_type] || room.price_per_night
         }));
       }
 
