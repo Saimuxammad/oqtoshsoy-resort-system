@@ -4,7 +4,10 @@ export const roomService = {
   getRooms: async (filters = {}) => {
     try {
       const response = await api.get('rooms');
-      console.log('Raw API response:', response.data);
+      console.log('Raw API response:', response);
+      console.log('Response data:', response.data);
+      console.log('Is response.data array?', Array.isArray(response.data));
+      console.log('Response data length:', response.data?.length);
 
       const roomTypeMap = {
         'STANDARD_2': "2 o'rinli standart",
@@ -17,25 +20,28 @@ export const roomService = {
         'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
       };
 
-      if (Array.isArray(response.data)) {
-        const transformedRooms = response.data.map(room => {
-          const transformed = {
-            ...room,
-            room_type: roomTypeMap[room.room_type] || room.room_type
-          };
-          return transformed;
-        });
+      // Убедимся, что у нас есть массив
+      const rooms = Array.isArray(response.data) ? response.data : [];
+      console.log('Rooms to transform:', rooms.length);
 
-        console.log('Transformed rooms:', transformedRooms);
-        console.log('Total rooms:', transformedRooms.length);
-        console.log('Unique room types:', [...new Set(transformedRooms.map(r => r.room_type))]);
+      const transformedRooms = rooms.map((room, index) => {
+        const transformed = {
+          ...room,
+          room_type: roomTypeMap[room.room_type] || room.room_type
+        };
+        if (index < 3) { // Логируем только первые 3 для отладки
+          console.log(`Room ${index}:`, room, '->', transformed);
+        }
+        return transformed;
+      });
 
-        return transformedRooms;
-      }
+      console.log('Total transformed rooms:', transformedRooms.length);
+      console.log('Unique room types:', [...new Set(transformedRooms.map(r => r.room_type))]);
 
-      return response.data;
+      return transformedRooms;
     } catch (error) {
       console.error('getRooms error:', error);
+      console.error('Error details:', error.response);
       return [];
     }
   },
