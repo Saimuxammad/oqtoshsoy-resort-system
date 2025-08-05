@@ -5,9 +5,54 @@ export const roomService = {
     try {
       const response = await api.get('rooms');
       console.log('Raw API response:', response);
-      console.log('Response data:', response.data);
-      console.log('Is response.data array?', Array.isArray(response.data));
-      console.log('Response data length:', response.data?.length);
+
+      let rooms = [];
+
+      // Обрабатываем разные возможные структуры ответа
+      if (Array.isArray(response.data)) {
+        // Если это массив
+        if (response.data.length > 0) {
+          // Проверяем, является ли первый элемент комнатой или контейнером
+          const firstItem = response.data[0];
+
+          if (firstItem.room_number && firstItem.room_type) {
+            // Это массив комнат
+            rooms = response.data;
+          } else if (Array.isArray(firstItem)) {
+            // Это массив массивов
+            rooms = firstItem;
+          } else if (typeof firstItem === 'object') {
+            // Это массив с одним объектом-контейнером
+            // Пробуем найти массив комнат внутри
+            const possibleKeys = ['rooms', 'data', 'items', 'results'];
+            for (const key of possibleKeys) {
+              if (Array.isArray(firstItem[key])) {
+                rooms = firstItem[key];
+                break;
+              }
+            }
+
+            // Если не нашли, берем все значения, которые являются массивами
+            if (rooms.length === 0) {
+              for (const value of Object.values(firstItem)) {
+                if (Array.isArray(value) && value.length > 0 && value[0].room_number) {
+                  rooms = value;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } else if (response.data && typeof response.data === 'object') {
+        // Если это объект, ищем массив комнат внутри
+        if (Array.isArray(response.data.rooms)) {
+          rooms = response.data.rooms;
+        } else if (Array.isArray(response.data.data)) {
+          rooms = response.data.data;
+        }
+      }
+
+      console.log('Extracted rooms:', rooms.length);
 
       const roomTypeMap = {
         'STANDARD_2': "2 o'rinli standart",
@@ -20,16 +65,12 @@ export const roomService = {
         'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
       };
 
-      // Убедимся, что у нас есть массив
-      const rooms = Array.isArray(response.data) ? response.data : [];
-      console.log('Rooms to transform:', rooms.length);
-
       const transformedRooms = rooms.map((room, index) => {
         const transformed = {
           ...room,
           room_type: roomTypeMap[room.room_type] || room.room_type
         };
-        if (index < 3) { // Логируем только первые 3 для отладки
+        if (index < 3) {
           console.log(`Room ${index}:`, room, '->', transformed);
         }
         return transformed;
