@@ -3,8 +3,8 @@ import api from './api';
 export const roomService = {
   getRooms: async (filters = {}) => {
     try {
-      const response = await api.get('rooms'); // Используем стандартный эндпоинт
-      console.log('Rooms loaded:', response.data);
+      const response = await api.get('rooms');
+      console.log('Raw API response:', response.data);
 
       const roomTypeMap = {
         'STANDARD_2': "2 o'rinli standart",
@@ -18,10 +18,20 @@ export const roomService = {
       };
 
       if (Array.isArray(response.data)) {
-        return response.data.map(room => ({
-          ...room,
-          room_type: roomTypeMap[room.room_type] || room.room_type
-        }));
+        const transformedRooms = response.data.map(room => {
+          const transformed = {
+            ...room,
+            room_type: roomTypeMap[room.room_type] || room.room_type
+          };
+          console.log(`Room ${room.id}: ${room.room_type} -> ${transformed.room_type}`);
+          return transformed;
+        });
+
+        console.log('Transformed rooms:', transformedRooms);
+        console.log('Total rooms:', transformedRooms.length);
+        console.log('Unique room types:', [...new Set(transformedRooms.map(r => r.room_type))]);
+
+        return transformedRooms;
       }
 
       return response.data;

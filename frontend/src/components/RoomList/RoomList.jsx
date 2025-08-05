@@ -30,14 +30,6 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
     toast.success('Yangilandi');
   };
 
-  // Group rooms by type
-  const groupedRooms = rooms?.reduce((acc, room) => {
-    const type = room.room_type;
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(room);
-    return acc;
-  }, {}) || {};
-
   if (isLoading) return <Loading />;
 
   if (error) {
@@ -79,30 +71,16 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
         {!rooms || rooms.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <p>Xonalar topilmadi</p>
-            <p className="text-sm mt-2">Backend serverini tekshiring</p>
-          </div>
-        ) : Object.keys(groupedRooms).length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Filtrlangan xonalar topilmadi</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedRooms).map(([type, typeRooms]) => (
-              <div key={type}>
-                <h3 className="text-lg font-medium text-gray-800 mb-3">
-                  {type} ({typeRooms.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {typeRooms.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onEdit={onEditRoom}
-                      onViewCalendar={onViewCalendar}
-                    />
-                  ))}
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {rooms.map((room) => (
+              <RoomCard
+                key={room.id}
+                room={room}
+                onEdit={onEditRoom}
+                onViewCalendar={onViewCalendar}
+              />
             ))}
           </div>
         )}
