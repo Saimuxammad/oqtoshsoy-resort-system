@@ -1,79 +1,101 @@
-import api from './api';
+import React, { useState } from 'react';
+import { useQuery } from 'react-query';
+import { roomService } from '../../services/roomService';
+import { RoomCard } from './RoomCard';
+import { RoomFilter } from './RoomFilter';
+import { Loading } from '../UI/Loading';
+import { Button } from '../UI/Button';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
-export const roomService = {
-  getRooms: async (filters = {}) => {
-    try {
-      const response = await api.get('rooms');
-      console.log('Raw API response:', response.data);
+export function RoomList({ onEditRoom, onViewCalendar }) {
+  const [filters, setFilters] = useState({});
 
-      const roomTypeMap = {
-        'STANDARD_2': "2 o'rinli standart",
-        'STANDARD_4': "4 o'rinli standart",
-        'LUX_2': "2 o'rinli lyuks",
-        'VIP_SMALL_4': "4 o'rinli kichik VIP",
-        'VIP_BIG_4': "4 o'rinli katta VIP",
-        'APARTMENT_4': "4 o'rinli apartament",
-        'COTTAGE_6': "Kottedj (6 kishi uchun)",
-        'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
-      };
-
-      if (Array.isArray(response.data)) {
-        const transformedRooms = response.data.map(room => {
-          const transformed = {
-            ...room,
-            room_type: roomTypeMap[room.room_type] || room.room_type
-          };
-          console.log(`Room ${room.id}: ${room.room_type} -> ${transformed.room_type}`);
-          return transformed;
-        });
-
-        console.log('Transformed rooms:', transformedRooms);
-        console.log('Total rooms:', transformedRooms.length);
-        console.log('Unique room types:', [...new Set(transformedRooms.map(r => r.room_type))]);
-
-        return transformedRooms;
+  const { data: rooms, isLoading, error, refetch } = useQuery(
+    ['rooms', filters],
+    () => roomService.getRooms(filters),
+    {
+      onError: (error) => {
+        console.error('Room fetch error:', error);
+        toast.error(`Xonalarni yuklashda xatolik: ${error.message}`);
+      },
+      onSuccess: (data) => {
+        console.log('Rooms loaded successfully:', data);
+        console.log('Total rooms:', data?.length);
       }
-
-      return response.data;
-    } catch (error) {
-      console.error('getRooms error:', error);
-      return [];
     }
-  },
+  );
 
-  getRoom: async (roomId) => {
-    try {
-      const response = await api.get(`rooms/${roomId}`);
-      return response.data;
-    } catch (error) {
-      console.error('getRoom error:', error);
-      throw error;
-    }
-  },
+  const handleRefresh = () => {
+    refetch();
+    toast.success('Yangilandi');
+  };
 
-  updateRoom: async (roomId, data) => {
-    try {
-      console.log('Updating room:', roomId, data);
-      const response = await api.patch(`rooms/${roomId}`, data);
-      console.log('Room updated:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('updateRoom error:', error);
-      throw error;
-    }
-  },
+  if (isLoading) return <Loading />;
 
-  checkAvailability: async (roomId, startDate, endDate) => {
-    try {
-      const params = new URLSearchParams({
-        start_date: startDate,
-        end_date: endDate
-      });
-      const response = await api.get(`rooms/${roomId}/availability?${params}`);
-      return response.data;
-    } catch (error) {
-      console.error('checkAvailability error:', error);
-      throw error;
-    }
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600 mb-4">Xatolik yuz berdi</p>
+        <p className="text-gray-600 mb-4">{error.message}</p>
+        <Button onClick={handleRefresh} variant="secondary">
+          <ArrowPathIcon className="h-4 w-4 mr-2" />
+          Qayta urinish
+        </Button>
+      </div>
+    );
   }
-};
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-6">
+      {/* Filters - Sidebar on desktop, top on mobile */}
+      <div className="lg:w-64 flex-shrink-0">
+        <RoomFilter filters={filters} onChange={setFilters} />
+      </div>
+
+      {/* Room List */}
+      <div className="flex-1">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Xonalar ro'yxati {rooms && `(${rooms.length})`}
+          </h2>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRefresh}
+          >
+            <ArrowPathIcon className="h-4 w-4 mr-2" />
+            Qayta yuklash
+          </Button>
+        </div>
+
+        {!rooms || rooms.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>Xonalar topilmadi</p>
+          </div>
+        ) : (
+          <div>
+            {/* Отображаем общую информацию */}
+            <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                Jami {rooms.length} xona topildi
+              </p>
+            </div>
+
+            {/* Отображаем все комнаты без группировки */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {rooms.map((room) => (
+                <RoomCard
+                  key={room.id}
+                  room={room}
+                  onEdit={onEditRoom}
+                  onViewCalendar={onViewCalendar}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
