@@ -295,6 +295,65 @@ async def get_rooms_raw(db: Session = Depends(get_db)):
         return {"error": str(e)}
 
 
+@app.get("/api/rooms")
+async def get_rooms_override(db: Session = Depends(get_db)):
+    """Override the default rooms endpoint with raw data"""
+    try:
+        from sqlalchemy import text
+
+        # Прямой SQL запрос для получения данных
+        result = db.execute(text("""
+                                 SELECT id, room_number, room_type::text as room_type
+                                 FROM rooms
+                                 ORDER BY id
+                                 """))
+
+        rooms = []
+        for row in result:
+            # Определяем capacity и цену на основе типа
+            room_type = row.room_type
+
+            capacity_map = {
+                'STANDARD_2': 2,
+                'STANDARD_4': 4,
+                'LUX_2': 2,
+                'VIP_SMALL_4': 4,
+                'VIP_BIG_4': 4,
+                'APARTMENT_4': 4,
+                'COTTAGE_6': 6,
+                'PRESIDENT_8': 8
+            }
+
+            price_map = {
+                'STANDARD_2': 500000,
+                'STANDARD_4': 700000,
+                'LUX_2': 800000,
+                'VIP_SMALL_4': 1000000,
+                'VIP_BIG_4': 1200000,
+                'APARTMENT_4': 1500000,
+                'COTTAGE_6': 2000000,
+                'PRESIDENT_8': 3000000
+            }
+
+            rooms.append({
+                "id": row.id,
+                "room_number": row.room_number,
+                "room_type": row.room_type,
+                "capacity": capacity_map.get(room_type, 2),
+                "price_per_night": price_map.get(room_type, 500000),
+                "description": "",
+                "amenities": "",
+                "is_available": True,
+                "created_at": "2024-01-01T00:00:00",
+                "updated_at": "2024-01-01T00:00:00"
+            })
+
+        return rooms
+    except Exception as e:
+        print(f"Error in get_rooms_override: {str(e)}")
+        return []
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}

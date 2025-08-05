@@ -3,8 +3,8 @@ import api from './api';
 export const roomService = {
   getRooms: async (filters = {}) => {
     try {
-      const response = await api.get('rooms-raw');
-      console.log('Rooms loaded from raw endpoint:', response.data);
+      const response = await api.get('rooms'); // Используем стандартный эндпоинт
+      console.log('Rooms loaded:', response.data);
 
       const roomTypeMap = {
         'STANDARD_2': "2 o'rinli standart",
@@ -17,34 +17,10 @@ export const roomService = {
         'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
       };
 
-      const capacityMap = {
-        'STANDARD_2': 2,
-        'STANDARD_4': 4,
-        'LUX_2': 2,
-        'VIP_SMALL_4': 4,
-        'VIP_BIG_4': 4,
-        'APARTMENT_4': 4,
-        'COTTAGE_6': 6,
-        'PRESIDENT_8': 8
-      };
-
-      const priceMap = {
-        'STANDARD_2': 500000,
-        'STANDARD_4': 700000,
-        'LUX_2': 800000,
-        'VIP_SMALL_4': 1000000,
-        'VIP_BIG_4': 1200000,
-        'APARTMENT_4': 1500000,
-        'COTTAGE_6': 2000000,
-        'PRESIDENT_8': 3000000
-      };
-
       if (Array.isArray(response.data)) {
         return response.data.map(room => ({
           ...room,
-          room_type: roomTypeMap[room.room_type] || room.room_type,
-          capacity: capacityMap[room.room_type] || room.capacity,
-          price_per_night: priceMap[room.room_type] || room.price_per_night
+          room_type: roomTypeMap[room.room_type] || room.room_type
         }));
       }
 
