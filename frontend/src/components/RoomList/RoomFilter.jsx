@@ -1,55 +1,67 @@
 import React from 'react';
-import { FunnelIcon } from '@heroicons/react/24/outline';
-import { ROOM_TYPES } from '../../utils/constants';
+import { Card, CardContent } from '../UI/Card';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function RoomFilter({ filters, onChange }) {
+  const { t } = useLanguage();
+
+  const roomTypes = [
+    { value: '', label: 'Barcha xonalar' },
+    { value: "2 o'rinli standart", label: "2 o'rinli standart" },
+    { value: "4 o'rinli standart", label: "4 o'rinli standart" },
+    { value: "2 o'rinli lyuks", label: "2 o'rinli lyuks" },
+    { value: "4 o'rinli kichik VIP", label: "4 o'rinli kichik VIP" },
+    { value: "4 o'rinli katta VIP", label: "4 o'rinli katta VIP" },
+    { value: "4 o'rinli apartament", label: "4 o'rinli apartament" },
+    { value: "Kottedj (6 kishi uchun)", label: "Kottedj" },
+    { value: "Prezident apartamenti (8 kishi uchun)", label: "Prezident apartamenti" }
+  ];
+
+  const handleTypeChange = (e) => {
+    onChange({ ...filters, type: e.target.value });
+  };
+
+  const handleStatusChange = (e) => {
+    onChange({ ...filters, status: e.target.value });
+  };
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-      <div className="flex items-center gap-2 mb-3">
-        <FunnelIcon className="h-5 w-5 text-gray-400" />
-        <h3 className="font-medium text-gray-900">Filtrlash</h3>
-      </div>
-
-      <div className="space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Holati
-          </label>
-          <select
-            value={filters.isAvailable ?? ''}
-            onChange={(e) => onChange({
-              ...filters,
-              isAvailable: e.target.value === '' ? undefined : e.target.value === 'true'
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="" className="text-gray-700">Barcha xonalar</option>
-            <option value="true" className="text-gray-700">Bo'sh xonalar</option>
-            <option value="false" className="text-gray-700">Band xonalar</option>
-          </select>
-        </div>
+    <Card>
+      <CardContent className="p-4 space-y-4">
+        <h3 className="font-medium text-gray-900">{t('filter')}</h3>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Xona turi
+            {t('roomType')}
           </label>
           <select
-            value={filters.roomType || ''}
-            onChange={(e) => onChange({
-              ...filters,
-              roomType: e.target.value || undefined
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filters.type || ''}
+            onChange={handleTypeChange}
+            className="w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
           >
-            <option value="" className="text-gray-700">Barcha turlar</option>
-            {Object.entries(ROOM_TYPES).map(([key, value]) => (
-              <option key={key} value={value} className="text-gray-700">
-                {value}
+            {roomTypes.map(type => (
+              <option key={type.value} value={type.value}>
+                {type.label}
               </option>
             ))}
           </select>
         </div>
-      </div>
-    </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {t('status')}
+          </label>
+          <select
+            value={filters.status || ''}
+            onChange={handleStatusChange}
+            className="w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option value="">Barcha</option>
+            <option value="available">{t('available')}</option>
+            <option value="occupied">{t('occupied')}</option>
+          </select>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
