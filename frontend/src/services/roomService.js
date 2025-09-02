@@ -4,9 +4,7 @@ export const roomService = {
   getRooms: async (filters = {}) => {
     try {
       const response = await api.get('rooms');
-
-      // Прямо работаем с массивом комнат
-      const rooms = response.data || [];
+      console.log('API Response:', response.data);
 
       const roomTypeMap = {
         'STANDARD_2': "2 o'rinli standart",
@@ -19,14 +17,14 @@ export const roomService = {
         'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
       };
 
-      const transformedRooms = rooms.map(room => ({
-        ...room,
-        room_type: roomTypeMap[room.room_type] || room.room_type
-      }));
+      if (Array.isArray(response.data)) {
+        return response.data.map(room => ({
+          ...room,
+          room_type: roomTypeMap[room.room_type] || room.room_type
+        }));
+      }
 
-      console.log('Loaded', transformedRooms.length, 'rooms');
-
-      return transformedRooms;
+      return [];
     } catch (error) {
       console.error('getRooms error:', error);
       return [];
@@ -45,7 +43,9 @@ export const roomService = {
 
   updateRoom: async (roomId, data) => {
     try {
+      console.log('Updating room:', roomId, data);
       const response = await api.patch(`rooms/${roomId}`, data);
+      console.log('Room updated:', response.data);
       return response.data;
     } catch (error) {
       console.error('updateRoom error:', error);
