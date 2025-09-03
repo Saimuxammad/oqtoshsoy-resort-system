@@ -49,10 +49,6 @@ export function Header() {
               <p className="text-sm opacity-90">Xonalarni boshqarish tizimi</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm opacity-90">Zona otdyxa Oqtoshsoy</span>
-            <span className="text-xs opacity-75">@Oqtosh_Soy</span>
-          </div>
         </div>
       </div>
     </header>
