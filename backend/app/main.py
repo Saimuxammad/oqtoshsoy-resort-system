@@ -90,16 +90,16 @@ async def get_rooms(
 
         # Базовый SQL запрос
         base_query = """
-                     SELECT r.id, \
-                            r.room_number, \
-                            r.room_type, \
-                            COALESCE(r.capacity, 2)             as capacity, \
-                            COALESCE(r.price_per_night, 500000) as price_per_night, \
-                            COALESCE(r.description, '')         as description, \
-                            COALESCE(r.amenities, '')           as amenities, \
-                            r.created_at, \
+                     SELECT r.id,
+                            r.room_number,
+                            r.room_type,
+                            COALESCE(r.capacity, 2)             as capacity,
+                            COALESCE(r.price_per_night, 500000) as price_per_night,
+                            COALESCE(r.description, '')         as description,
+                            COALESCE(r.amenities, '')           as amenities,
+                            r.created_at,
                             r.updated_at
-                     FROM rooms r \
+                     FROM rooms r
                      """
 
         # Добавляем фильтры
@@ -137,13 +137,13 @@ async def get_rooms(
             # Проверяем занятость если нужен фильтр по статусу
             is_available = True
             if status:
-                # Используем <= и >= для текущей даты, так как гость еще находится в номере
+                # ИСПРАВЛЕНО: Используем < и > для проверки текущей занятости
                 booking_check = db.execute(text("""
                                                 SELECT COUNT(*)
                                                 FROM bookings
                                                 WHERE room_id = :room_id
                                                   AND start_date <= :today
-                                                  AND end_date >= :today
+                                                  AND end_date > :today
                                                 """), {"room_id": row.id, "today": date.today()})
                 is_occupied = booking_check.scalar() > 0
 
@@ -403,13 +403,13 @@ async def create_booking(booking_data: BookingCreate, db: Session = Depends(get_
     try:
         from sqlalchemy import text
 
-        # Проверяем доступность
+        # ИСПРАВЛЕНО: Используем правильную логику (< и > вместо <= и >=)
         check = db.execute(text("""
                                 SELECT COUNT(*)
                                 FROM bookings
                                 WHERE room_id = :room_id
-                                  AND start_date <= :end_date
-                                  AND end_date >= :start_date
+                                  AND start_date < :end_date
+                                  AND end_date > :start_date
                                 """), {
                                "room_id": booking_data.room_id,
                                "start_date": booking_data.start_date,
@@ -417,7 +417,25 @@ async def create_booking(booking_data: BookingCreate, db: Session = Depends(get_
                            })
 
         if check.scalar() > 0:
-            raise HTTPException(status_code=400, detail="Room is not available for selected dates")
+            # Получаем детали конфликтов для более информативного сообщения
+            conflicts = db.execute(text("""
+                                        SELECT id, start_date, end_date, guest_name
+                                        FROM bookings
+                                        WHERE room_id = :room_id
+                                          AND start_date < :end_date
+                                          AND end_date > :start_date
+                                        """), {
+                                       "room_id": booking_data.room_id,
+                                       "start_date": booking_data.start_date,
+                                       "end_date": booking_data.end_date
+                                   })
+
+            conflict_list = []
+            for c in conflicts:
+                conflict_list.append(f"{c.start_date} - {c.end_date}")
+
+            error_message = f"Room is not available for selected dates. Conflicts: {', '.join(conflict_list)}"
+            raise HTTPException(status_code=400, detail=error_message)
 
         # Создаем бронирование
         result = db.execute(text("""
@@ -523,6 +541,49 @@ async def update_booking(booking_id: int, booking_data: BookingUpdate, db: Sessi
         existing = check.fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Booking not found")
+
+        # ИСПРАВЛЕНО: Если обновляются даты, проверяем конфликты
+        check_start = booking_data.start_date if booking_data.start_date else existing.start_date
+        check_end = booking_data.end_date if booking_data.end_date else existing.end_date
+
+        if booking_data.start_date or booking_data.end_date:
+            # Проверяем конфликты с НОВОЙ логикой, исключая текущее бронирование
+            conflicts = db.execute(text("""
+                                        SELECT COUNT(*)
+                                        FROM bookings
+                                        WHERE room_id = :room_id
+                                          AND id != :booking_id
+                                          AND start_date < :end_date
+                                          AND end_date > :start_date
+                                        """), {
+                                       "room_id": existing.room_id,
+                                       "booking_id": booking_id,
+                                       "start_date": check_start,
+                                       "end_date": check_end
+                                   })
+
+            if conflicts.scalar() > 0:
+                # Получаем детали конфликтов
+                conflict_details = db.execute(text("""
+                                                   SELECT id, start_date, end_date
+                                                   FROM bookings
+                                                   WHERE room_id = :room_id
+                                                     AND id != :booking_id
+                                                     AND start_date < :end_date
+                                                     AND end_date > :start_date
+                                                   """), {
+                                                  "room_id": existing.room_id,
+                                                  "booking_id": booking_id,
+                                                  "start_date": check_start,
+                                                  "end_date": check_end
+                                              })
+
+                conflict_list = []
+                for c in conflict_details:
+                    conflict_list.append(f"{c.start_date} - {c.end_date}")
+
+                error_message = f"Room is not available for selected dates. Conflicts: {', '.join(conflict_list)}"
+                raise HTTPException(status_code=400, detail=error_message)
 
         updates = []
         params = {"id": booking_id}
@@ -634,53 +695,6 @@ async def api_root():
     return {"message": "API is running", "version": "2.0.0"}
 
 
-@app.get("/api/fix-room-types")
-async def fix_room_types(db: Session = Depends(get_db)):
-    """Обновляет типы комнат на узбекские названия"""
-    try:
-        from sqlalchemy import text
-
-        logger.info("Updating room types to Uzbek names...")
-
-        updates = [
-            ("STANDARD_2", "2 o'rinli standart"),
-            ("STANDARD_4", "4 o'rinli standart"),
-            ("LUX_2", "2 o'rinli lyuks"),
-            ("VIP_SMALL_4", "4 o'rinli kichik VIP"),
-            ("VIP_BIG_4", "4 o'rinli katta VIP"),
-            ("APARTMENT_4", "4 o'rinli apartament"),
-            ("COTTAGE_6", "Kottedj (6 kishi uchun)"),
-            ("PRESIDENT_8", "Prezident apartamenti (8 kishi uchun)")
-        ]
-
-        total_updated = 0
-        for old_type, new_type in updates:
-            result = db.execute(text("""
-                                     UPDATE rooms
-                                     SET room_type = :new_type
-                                     WHERE room_type = :old_type
-                                     """), {"old_type": old_type, "new_type": new_type})
-            total_updated += result.rowcount
-            db.commit()
-
-        # Проверяем результат
-        result = db.execute(text("SELECT room_type, COUNT(*) FROM rooms GROUP BY room_type ORDER BY room_type"))
-        room_types = []
-        for row in result:
-            room_types.append(f"{row[0]}: {row[1]} rooms")
-
-        return {
-            "status": "success",
-            "message": f"Updated {total_updated} rooms",
-            "current_types": room_types
-        }
-
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error updating room types: {e}")
-        return {"status": "error", "message": str(e)}
-
-
 @app.get("/api/test-booking-conflicts")
 async def test_booking_conflicts(
         room_id: int,
@@ -768,81 +782,6 @@ async def test_booking_conflicts(
 
     except Exception as e:
         return {"error": str(e)}
-
-
-@app.get("/api/test-create-booking")
-async def test_create_booking(
-        room_id: int,
-        start_date: str,
-        end_date: str,
-        guest_name: str = "Test",
-        db: Session = Depends(get_db)
-):
-    """Тестовый эндпоинт для создания бронирования GET запросом"""
-    try:
-        from sqlalchemy import text
-
-        # Проверяем конфликты с новой логикой
-        conflicts = db.execute(text("""
-                                    SELECT id, start_date, end_date
-                                    FROM bookings
-                                    WHERE room_id = :room_id
-                                      AND start_date < :end_date
-                                      AND end_date > :start_date
-                                    """), {
-                                   "room_id": room_id,
-                                   "start_date": start_date,
-                                   "end_date": end_date
-                               })
-
-        conflict_list = []
-        for c in conflicts:
-            conflict_list.append({
-                "id": c.id,
-                "dates": f"{c.start_date} - {c.end_date}"
-            })
-
-        if len(conflict_list) > 0:
-            return {
-                "status": "conflict",
-                "message": "Conflicts found with new logic",
-                "conflicts": conflict_list
-            }
-
-        # Создаем бронирование
-        result = db.execute(text("""
-                                 INSERT INTO bookings (room_id, start_date, end_date, guest_name, notes, created_by,
-                                                       created_at, updated_at)
-                                 VALUES (:room_id, :start_date, :end_date, :guest_name, 'Test booking', 1, NOW(),
-                                         NOW()) RETURNING id
-                                 """), {
-                                "room_id": room_id,
-                                "start_date": start_date,
-                                "end_date": end_date,
-                                "guest_name": guest_name
-                            })
-
-        booking_id = result.scalar()
-        db.commit()
-
-        return {
-            "status": "success",
-            "message": "Booking created successfully",
-            "booking_id": booking_id,
-            "details": {
-                "room_id": room_id,
-                "start_date": start_date,
-                "end_date": end_date,
-                "guest_name": guest_name
-            }
-        }
-
-    except Exception as e:
-        db.rollback()
-        return {
-            "status": "error",
-            "message": str(e)
-        }
 
 
 if __name__ == "__main__":

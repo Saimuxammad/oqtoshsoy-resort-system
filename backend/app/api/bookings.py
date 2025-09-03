@@ -236,3 +236,67 @@ async def check_availability(
         "start_date": str(start_date),
         "end_date": str(end_date)
     }
+
+
+# Добавьте этот новый эндпоинт в файл bookings.py ПОСЛЕ существующего эндпоинта create_booking
+
+@router.post("/v2", response_model=Booking)
+async def create_booking_v2(
+        booking: BookingCreate,
+        db: Session = Depends(get_db),
+        current_user=Depends(get_current_user)
+):
+    """
+    Create new booking with improved logic for room availability.
+    This endpoint ensures that only the specific room being booked is checked.
+    """
+    # Check if room exists
+    room = db.query(Room).filter(Room.id == booking.room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # КРИТИЧЕСКИ ВАЖНО: Проверяем доступность ТОЛЬКО для указанной комнаты
+    # Не должны проверять другие комнаты!
+    if not BookingService.check_availability(db, booking.room_id, booking.start_date, booking.end_date):
+        # Получаем конфликтующие бронирования для более детального сообщения
+        conflicts = db.query(BookingModel).filter(
+            BookingModel.room_id == booking.room_id,  # ТОЛЬКО эта комната
+            BookingModel.start_date <= booking.end_date,
+            BookingModel.end_date >= booking.start_date
+        ).all()
+
+        conflict_details = []
+        for conflict in conflicts:
+            conflict_details.append(f"{conflict.start_date} - {conflict.end_date}")
+
+        error_message = f"Room №{room.room_number} is not available for selected dates. "
+        if conflict_details:
+            error_message += f"Conflicts with existing bookings: {', '.join(conflict_details)}"
+
+        raise HTTPException(status_code=400, detail=error_message)
+
+    # Create booking
+    new_booking = BookingService.create_booking(db, booking, current_user.id)
+
+    # Log history
+    HistoryService.log_action(
+        db=db,
+        user_id=current_user.id,
+        entity_type="booking",
+        entity_id=new_booking.id,
+        action="create",
+        description=f"Created booking for room №{room.room_number} from {booking.start_date} to {booking.end_date}"
+    )
+
+    # Send notification
+    await notification_service.send_booking_created(db, new_booking, room, current_user)
+
+    # Broadcast via WebSocket
+    await manager.broadcast_booking_update(new_booking.id, "create", {
+        "room_id": room.id,
+        "room_number": room.room_number,
+        "start_date": str(booking.start_date),
+        "end_date": str(booking.end_date)
+    })
+
+    return new_booking

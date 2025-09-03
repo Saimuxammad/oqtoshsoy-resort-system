@@ -1,68 +1,73 @@
-# Конфигурация администраторов и пользователей системы
-# Telegram ID пользователей с разными ролями
+# backend/config/admins.py
+"""
+Конфигурация пользователей системы и их ролей
+"""
 
-# Супер-админы - полный доступ ко всему
+# Telegram IDs администраторов и пользователей
+# Замените эти ID на реальные Telegram ID ваших пользователей
+
 SUPER_ADMINS = [
-    123456789,  # Dev Admin (для тестирования)
-    # Добавьте свой Telegram ID сюда
+    5488749868,  # Главный администратор - замените на ваш Telegram ID
 ]
 
-# Администраторы - почти полный доступ
 ADMINS = [
-    # Добавьте Telegram ID администраторов
+    123456789,  # Администратор 1
+    # 987654321,  # Администратор 2 (добавьте при необходимости)
 ]
 
-# Менеджеры - управление бронированиями
 MANAGERS = [
-    # Добавьте Telegram ID менеджеров
+    # 111111111,  # Менеджер 1
 ]
 
-# Операторы - создание и просмотр бронирований
 OPERATORS = [
-    # Добавьте Telegram ID операторов
+    # 222222222,  # Оператор 1
+    # 333333333,  # Оператор 2
 ]
 
-# Разрешенные пользователи (если нужно ограничить доступ)
-# Если список пустой - доступ разрешен всем
-ALLOWED_USERS = []  # Оставьте пустым для открытого доступа
+# Все разрешенные пользователи (3-4 человека как вы указали)
+ALLOWED_USERS = SUPER_ADMINS + ADMINS + MANAGERS + OPERATORS
 
 
 def is_super_admin(telegram_id: int) -> bool:
-    """Проверка является ли пользователь супер-админом"""
+    """Проверяет, является ли пользователь супер-администратором"""
     return telegram_id in SUPER_ADMINS
 
 
 def is_admin(telegram_id: int) -> bool:
-    """Проверка является ли пользователь админом"""
+    """Проверяет, является ли пользователь администратором"""
     return telegram_id in ADMINS or telegram_id in SUPER_ADMINS
 
 
 def is_manager(telegram_id: int) -> bool:
-    """Проверка является ли пользователь менеджером"""
-    return telegram_id in MANAGERS or is_admin(telegram_id)
+    """Проверяет, является ли пользователь менеджером"""
+    return telegram_id in MANAGERS
 
 
 def is_operator(telegram_id: int) -> bool:
-    """Проверка является ли пользователь оператором"""
-    return telegram_id in OPERATORS or is_manager(telegram_id)
+    """Проверяет, является ли пользователь оператором"""
+    return telegram_id in OPERATORS
 
 
 def is_allowed_user(telegram_id: int) -> bool:
-    """Проверка разрешен ли доступ пользователю"""
-    if not ALLOWED_USERS:  # Если список пустой - доступ всем
+    """Проверяет, разрешен ли доступ пользователю к системе"""
+    # В режиме разработки разрешаем доступ всем
+    import os
+    if os.getenv("ENVIRONMENT", "development") == "development":
         return True
-    return telegram_id in ALLOWED_USERS or is_operator(telegram_id)
+
+    # В продакшене проверяем список разрешенных пользователей
+    return telegram_id in ALLOWED_USERS
 
 
 def get_user_role(telegram_id: int) -> str:
-    """Получить роль пользователя по Telegram ID"""
+    """Возвращает роль пользователя"""
     if is_super_admin(telegram_id):
         return "super_admin"
-    elif telegram_id in ADMINS:
+    elif is_admin(telegram_id):
         return "admin"
-    elif telegram_id in MANAGERS:
+    elif is_manager(telegram_id):
         return "manager"
-    elif telegram_id in OPERATORS:
+    elif is_operator(telegram_id):
         return "operator"
     else:
         return "user"

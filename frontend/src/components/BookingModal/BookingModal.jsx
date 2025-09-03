@@ -27,7 +27,7 @@ export function BookingModal({ isOpen, onClose, room, booking = null }) {
       onSuccess: () => {
         queryClient.invalidateQueries('rooms');
         queryClient.invalidateQueries('bookings');
-        toast.success('Bron muvaffaqiyatli yangilandi');
+                toast.success('Bron muvaffaqiyatli yangilandi');
         onClose();
       },
       onError: (error) => {

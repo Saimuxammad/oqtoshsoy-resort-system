@@ -9,7 +9,7 @@ import os
 
 from ..database import get_db
 from ..models.user import User, UserRole
-from ..config.admins import is_super_admin, is_admin, is_allowed_user
+from ..config.admins import is_super_admin, is_admin, is_allowed_user, get_user_role
 from ..utils.dependencies import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 from ..schemas.user import UserResponse, TelegramAuthData
 
@@ -65,7 +65,9 @@ def verify_telegram_auth(init_data: str) -> dict:
 
     except Exception as e:
         # В случае ошибки в dev режиме возвращаем тестового пользователя
-        return {"user": {"id": 123456789, "first_name": "Dev", "last_name": "User"}}
+        if os.getenv("ENVIRONMENT", "development") == "development":
+            return {"user": {"id": 123456789, "first_name": "Dev", "last_name": "User"}}
+        raise
 
 
 @router.post("/telegram", response_model=dict)
@@ -87,27 +89,32 @@ async def telegram_auth(
                 detail="Invalid user data"
             )
 
-        # Временно отключаем проверку для тестирования
-        # if not is_allowed_user(telegram_id):
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Access denied. You are not authorized to use this system."
-        #     )
+        # ВКЛЮЧАЕМ проверку доступа для продакшена
+        if os.getenv("ENVIRONMENT", "development") == "production":
+            if not is_allowed_user(telegram_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied. You are not authorized to use this system. Please contact administrator."
+                )
 
         user = db.query(User).filter(User.telegram_id == telegram_id).first()
 
         if not user:
             # Create new user
             # Определяем роль на основе конфигурации
-            if is_super_admin(telegram_id):
-                role = UserRole.SUPER_ADMIN
-                is_admin_flag = True
-            elif is_admin(telegram_id):
-                role = UserRole.ADMIN
-                is_admin_flag = True
-            else:
-                role = UserRole.USER
-                is_admin_flag = False
+            user_role_str = get_user_role(telegram_id)
+
+            # Преобразуем строковую роль в enum
+            role_map = {
+                "super_admin": UserRole.SUPER_ADMIN,
+                "admin": UserRole.ADMIN,
+                "manager": UserRole.MANAGER,
+                "operator": UserRole.OPERATOR,
+                "user": UserRole.USER
+            }
+
+            role = role_map.get(user_role_str, UserRole.USER)
+            is_admin_flag = role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]
 
             user = User(
                 telegram_id=telegram_id,
@@ -128,12 +135,19 @@ async def telegram_auth(
             user.username = user_data.get("username", user.username)
 
             # Обновляем роль, если пользователь добавлен в админы
-            if is_super_admin(telegram_id):
-                user.role = UserRole.SUPER_ADMIN
-                user.is_admin = True
-            elif is_admin(telegram_id):
-                user.role = UserRole.ADMIN
-                user.is_admin = True
+            user_role_str = get_user_role(telegram_id)
+            role_map = {
+                "super_admin": UserRole.SUPER_ADMIN,
+                "admin": UserRole.ADMIN,
+                "manager": UserRole.MANAGER,
+                "operator": UserRole.OPERATOR,
+                "user": UserRole.USER
+            }
+
+            new_role = role_map.get(user_role_str, UserRole.USER)
+            if new_role != user.role:
+                user.role = new_role
+                user.is_admin = new_role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]
 
             db.commit()
 
@@ -153,7 +167,8 @@ async def telegram_auth(
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "username": user.username,
-                "is_admin": user.is_admin
+                "is_admin": user.is_admin,
+                "role": user.role.value
             }
         }
 
@@ -161,18 +176,21 @@ async def telegram_auth(
         raise
     except Exception as e:
         # В dev режиме возвращаем тестовый токен
-        return {
-            "token": "dev_token_123456",
-            "token_type": "bearer",
-            "user": {
-                "id": 1,
-                "telegram_id": 123456789,
-                "first_name": "Dev",
-                "last_name": "User",
-                "username": "dev_user",
-                "is_admin": True
+        if os.getenv("ENVIRONMENT", "development") == "development":
+            return {
+                "token": "dev_token_123456",
+                "token_type": "bearer",
+                "user": {
+                    "id": 1,
+                    "telegram_id": 123456789,
+                    "first_name": "Dev",
+                    "last_name": "User",
+                    "username": "dev_user",
+                    "is_admin": True,
+                    "role": "admin"
+                }
             }
-        }
+        raise
 
 
 @router.get("/me", response_model=UserResponse)
