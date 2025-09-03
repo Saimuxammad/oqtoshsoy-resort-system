@@ -116,9 +116,6 @@ export function BookingsList() {
                       <span className="text-sm text-gray-600">
                         {booking.room?.room_type}
                       </span>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        ID: {booking.id}
-                      </span>
                     </div>
 
                     <p className="text-sm text-gray-600 mb-1">
