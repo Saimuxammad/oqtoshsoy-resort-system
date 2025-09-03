@@ -1,159 +1,81 @@
-import React, { useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { Toaster } from 'react-hot-toast';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { Header } from './components/Layout/Header';
-import { Navigation } from './components/Layout/Navigation';
-import { RoomList } from './components/RoomList/RoomList';
-import { BookingsList } from './components/BookingsList/BookingsList';
-import { BookingModal } from './components/BookingModal/BookingModal';
-import { CalendarView } from './components/Calendar/CalendarView';
-import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
-import { HistoryLog } from './components/History/HistoryLog';
-import { SettingsPanel } from './components/Settings/SettingsPanel';
-import { AccessDenied } from './components/AccessDenied';
-import { Loading } from './components/UI/Loading';
-import { useTelegram } from './hooks/useTelegram';
-import { authService } from './services/authService';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
+// Добавьте эту проверку в начало App.jsx после импортов
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('rooms');
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const { user, isReady } = useTelegram();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [authToken, setAuthToken] = useState(null);
-  const [authError, setAuthError] = useState(null);
-  const [userInfo, setUserInfo] = useState(null);
+  // ... остальные стейты
 
   useEffect(() => {
-    console.log('App starting...');
-    console.log('import.meta.env.DEV:', import.meta.env.DEV);
-    console.log('Telegram WebApp:', window.Telegram?.WebApp);
-    console.log('User:', user);
-    console.log('isReady:', isReady);
-
-    // Для production Railway или dev режима
-    if (import.meta.env.DEV || !window.Telegram?.WebApp) {
-      console.log('Dev mode or no Telegram - auto authenticate');
-      setIsAuthenticated(true);
-      setAuthToken('dev_token');
-      setIsLoading(false);
-    } else if (isReady && user) {
-      console.log('Telegram mode - authenticating...');
-      authService.authenticate(window.Telegram.WebApp.initData)
-        .then((data) => {
-          console.log('Auth success:', data);
-          setIsAuthenticated(true);
-          setAuthToken(data.token || 'dev_token');
-          setUserInfo(data.user);
-
-          // Сохраняем информацию о пользователе
-          if (data.user) {
-            localStorage.setItem('current_user', JSON.stringify(data.user));
-          }
-        })
-        .catch((error) => {
-          console.error('Authentication failed:', error);
-
-          // Проверяем, это ошибка доступа или другая ошибка
-          if (error.response?.status === 403) {
-            setAuthError('Access denied. You are not authorized to use this system.');
-            setIsAuthenticated(false);
-          } else {
-            // В production тоже разрешаем для тестирования
-            setIsAuthenticated(true);
-            setAuthToken('dev_token');
-          }
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      // Если ничего не сработало - все равно показываем интерфейс
-      setTimeout(() => {
-        console.log('Timeout - auto authenticate');
-        setIsAuthenticated(true);
-        setAuthToken('dev_token');
-        setIsLoading(false);
-      }, 1000);
+    // Проверяем авторизацию
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
     }
-  }, [isReady, user]);
+  }, []);
 
-  const handleEditRoom = (room) => {
-    setSelectedRoom(room);
-    setSelectedBooking(room.current_booking);
-    setIsBookingModalOpen(true);
+  const handleLogin = (user) => {
+    setCurrentUser(user);
   };
 
-  const handleViewCalendar = (room) => {
-    setSelectedRoom(room);
-    setActiveTab('calendar');
+  const handleLogout = () => {
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
+    toast.success('Tizimdan chiqdingiz');
   };
 
-  const handleCloseModal = () => {
-    setIsBookingModalOpen(false);
-    setSelectedRoom(null);
-    setSelectedBooking(null);
+  // Если не авторизован - показываем форму входа
+  if (!currentUser) {
+    return <LoginForm onLogin={handleLogin} />;
+  }
+
+  // Проверка прав доступа
+  const hasPermission = (permission) => {
+    return currentUser.permissions.includes(permission);
   };
 
-  if (isLoading) {
-    return <Loading text="Tizimga ulanmoqda..." />;
-  }
+  // Фильтруем вкладки на основе прав
+  const getVisibleTabs = () => {
+    const tabs = ['rooms', 'bookings'];
 
-  if (!isAuthenticated && authError) {
-    return <AccessDenied message={authError} />;
-  }
+    if (hasPermission('analytics')) tabs.push('analytics');
+    tabs.push('history'); // История доступна всем
+    if (hasPermission('settings')) tabs.push('settings');
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Ruxsat berilmagan
-          </h2>
-          <p className="text-gray-600">
-            Iltimos, Telegram orqali kiring
-          </p>
-        </div>
-      </div>
-    );
-  }
+    return tabs;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
-      <Navigation activeTab={activeTab} onChange={setActiveTab} />
+      <Header currentUser={currentUser} onLogout={handleLogout} />
+      <Navigation
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        visibleTabs={getVisibleTabs()}
+        hasPermission={hasPermission}
+      />
 
       <main className="container mx-auto px-4 py-6">
+        {/* Контент в зависимости от прав */}
         {activeTab === 'rooms' && (
           <RoomList
-            onEditRoom={handleEditRoom}
+            onEditRoom={hasPermission('update') ? handleEditRoom : null}
             onViewCalendar={handleViewCalendar}
+            canCreate={hasPermission('create')}
           />
         )}
 
         {activeTab === 'bookings' && (
-          <BookingsList />
+          <BookingsList
+            canDelete={hasPermission('delete')}
+            canEdit={hasPermission('update')}
+          />
         )}
 
-        {activeTab === 'calendar' && (
-          <CalendarView selectedRoom={selectedRoom} />
-        )}
-
-        {activeTab === 'analytics' && (
+        {activeTab === 'analytics' && hasPermission('analytics') && (
           <AnalyticsDashboard />
         )}
 
@@ -161,37 +83,20 @@ function AppContent() {
           <HistoryLog />
         )}
 
-        {activeTab === 'settings' && (
+        {activeTab === 'settings' && hasPermission('settings') && (
           <SettingsPanel />
         )}
       </main>
 
-      <BookingModal
-        isOpen={isBookingModalOpen}
-        onClose={handleCloseModal}
-        room={selectedRoom}
-        booking={selectedBooking}
-      />
-    </div>
-  );
-}
-
-export default function App() {
-  return (
-    <LanguageProvider>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-          }}
+      {/* Модальное окно доступно только если есть права на создание/редактирование */}
+      {hasPermission('create') && (
+        <BookingModal
+          isOpen={isBookingModalOpen}
+          onClose={handleCloseModal}
+          room={selectedRoom}
+          booking={selectedBooking}
         />
-      </QueryClientProvider>
-    </LanguageProvider>
+      )}
+    </div>
   );
 }
