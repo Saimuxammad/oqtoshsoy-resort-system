@@ -9,7 +9,7 @@ export const bookingService = {
       if (filters.startDate) params.append('start_date', filters.startDate);
       if (filters.endDate) params.append('end_date', filters.endDate);
 
-      const response = await api.get(`/bookings?${params}`);
+      const response = await api.get(`/bookings${params.toString() ? '?' + params.toString() : ''}`);
       console.log('[BookingService] Bookings loaded:', response.data);
       return response.data;
     } catch (error) {
@@ -78,13 +78,17 @@ export const bookingService = {
     }
   },
 
-  // Delete booking - ИСПРАВЛЕННАЯ версия
+  // Delete booking - ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ
   deleteBooking: async (bookingId) => {
     try {
-      console.log('[BookingService] Deleting booking:', bookingId);
+      console.log('[BookingService] Deleting booking ID:', bookingId);
 
-      // Используем правильный URL с /bookings/ вместо /api/bookings/
-      const response = await api.delete(`/bookings/${bookingId}`);
+      // Формируем правильный URL
+      const url = `bookings/${bookingId}`;
+      console.log('[BookingService] DELETE URL:', url);
+
+      // Отправляем запрос
+      const response = await api.delete(url);
 
       console.log('[BookingService] Delete response:', response.data);
       return response.data;
@@ -93,7 +97,10 @@ export const bookingService = {
       console.error('[BookingService] Error response:', error.response);
 
       if (error.response?.status === 404) {
-        throw new Error(`Bron #${bookingId} topilmadi`);
+        // Более информативное сообщение об ошибке
+        const message = `Bron #${bookingId} topilmadi yoki allaqachon o'chirilgan`;
+        console.error('[BookingService]', message);
+        throw new Error(message);
       } else if (error.response?.status === 405) {
         throw new Error('Server does not support DELETE method');
       }
@@ -115,7 +122,7 @@ export const bookingService = {
         params.append('exclude_booking_id', excludeBookingId);
       }
 
-      const response = await api.get(`/bookings/check-availability?${params}`);
+      const response = await api.get(`/bookings/check-availability?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('[BookingService] checkAvailability error:', error);
