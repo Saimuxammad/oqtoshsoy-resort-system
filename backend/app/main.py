@@ -11,6 +11,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from .database import engine, get_db
+from .api import users
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -73,6 +74,7 @@ app.add_middleware(
 # Создаем роутеры для API
 rooms_router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 bookings_router = APIRouter(prefix="/api/bookings", tags=["bookings"])
+app.include_router(users.router, prefix="/api/users", tags=["users"])
 
 
 @rooms_router.get("")

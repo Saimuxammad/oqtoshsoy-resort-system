@@ -4,144 +4,179 @@ from typing import List
 
 from ..database import get_db
 from ..models.user import User, UserRole
-from ..schemas.user import UserResponse, UserUpdate
-from ..utils.dependencies import get_current_user
+from ..utils.dependencies import get_current_user, require_super_admin
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[UserResponse])
-async def get_users(
+@router.get("/", response_model=List[dict])
+async def get_all_users(
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+        current_user: User = Depends(require_super_admin)
 ):
-    """Get all users (only for admins)"""
-    if not current_user.can_manage_bookings:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can view users"
-        )
+    """Получить список всех пользователей (только для Super Admin)"""
+    users = db.query(User).all()
 
-    users = db.query(User).order_by(User.created_at.desc()).all()
-    return users
+    result = []
+    for user in users:
+        result.append({
+            "id": user.id,
+            "telegram_id": user.telegram_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "username": user.username,
+            "email": user.email,
+            "phone": user.phone,
+            "role": user.role.value,
+            "is_active": user.is_active,
+            "is_admin": user.is_admin,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "can_create_bookings": user.can_create_bookings,
+            "can_edit_bookings": user.can_edit_bookings,
+            "can_delete_any_booking": user.can_delete_any_booking,
+            "can_view_analytics": user.can_view_analytics,
+            "can_manage_settings": user.can_manage_settings,
+            "can_manage_users": user.can_manage_users
+        })
+
+    return result
 
 
-@router.get("/admins", response_model=List[UserResponse])
-async def get_admins(
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    """Get all admin users"""
-    if not current_user.can_manage_bookings:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can view admin list"
-        )
-
-    admins = db.query(User).filter(
-        User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN])
-    ).order_by(User.created_at.desc()).all()
-    return admins
-
-
-@router.patch("/{user_id}", response_model=UserResponse)
-async def update_user(
+@router.patch("/{user_id}/role")
+async def update_user_role(
         user_id: int,
-        user_update: UserUpdate,
+        role_data: dict,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+        current_user: User = Depends(require_super_admin)
 ):
-    """Update user (only for super admins)"""
-    if not current_user.can_manage_users:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super admins can update users"
-        )
-
+    """Изменить роль пользователя (только для Super Admin)"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Нельзя изменить роль себе
+    if user.id == current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=400,
+            detail="Cannot change your own role"
         )
 
-    # Нельзя понизить права супер-админа самому себе
-    if user.id == current_user.id and user_update.role and user_update.role != UserRole.SUPER_ADMIN:
+    try:
+        new_role = role_data.get("role", "").upper()
+        if new_role not in [r.name for r in UserRole]:
+            # Пробуем найти роль по значению
+            for role in UserRole:
+                if role.value == role_data.get("role", "").lower():
+                    new_role = role.name
+                    break
+
+        user.role = UserRole[new_role]
+
+        # Обновляем флаг is_admin для обратной совместимости
+        user.is_admin = user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]
+
+        db.commit()
+
+        return {
+            "message": "Role updated successfully",
+            "user_id": user.id,
+            "new_role": user.role.value
+        }
+    except KeyError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot downgrade your own super admin role"
+            status_code=400,
+            detail=f"Invalid role. Must be one of: {', '.join([r.value for r in UserRole])}"
         )
 
-    # Обновляем поля
-    update_data = user_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(user, field, value)
 
-    # Синхронизируем is_admin с role
-    if user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
-        user.is_admin = True
-    else:
-        user.is_admin = False
-
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-@router.post("/{user_id}/deactivate", response_model=UserResponse)
-async def deactivate_user(
+@router.patch("/{user_id}/status")
+async def update_user_status(
         user_id: int,
+        status_data: dict,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+        current_user: User = Depends(require_super_admin)
 ):
-    """Deactivate user (only for super admins)"""
-    if not current_user.can_manage_users:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super admins can deactivate users"
-        )
-
+    """Активировать/деактивировать пользователя (только для Super Admin)"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=404, detail="User not found")
 
     # Нельзя деактивировать себя
     if user.id == current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot deactivate yourself"
+            status_code=400,
+            detail="Cannot deactivate your own account"
         )
 
-    user.is_active = False
+    user.is_active = status_data.get("is_active", user.is_active)
     db.commit()
-    db.refresh(user)
-    return user
+
+    return {
+        "message": "Status updated successfully",
+        "user_id": user.id,
+        "is_active": user.is_active
+    }
 
 
-@router.post("/{user_id}/activate", response_model=UserResponse)
-async def activate_user(
-        user_id: int,
+@router.get("/me", response_model=dict)
+async def get_current_user_info(
+        current_user: User = Depends(get_current_user)
+):
+    """Получить информацию о текущем пользователе"""
+    return {
+        "id": current_user.id,
+        "telegram_id": current_user.telegram_id,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "username": current_user.username,
+        "email": current_user.email,
+        "phone": current_user.phone,
+        "role": current_user.role.value,
+        "role_display": current_user.get_role_display(),
+        "is_active": current_user.is_active,
+        "is_admin": current_user.is_admin,
+        "permissions": {
+            "can_view_rooms": current_user.can_view_rooms,
+            "can_create_bookings": current_user.can_create_bookings,
+            "can_edit_bookings": current_user.can_edit_bookings,
+            "can_delete_bookings": current_user.can_delete_bookings,
+            "can_delete_any_booking": current_user.can_delete_any_booking,
+            "can_view_analytics": current_user.can_view_analytics,
+            "can_export_data": current_user.can_export_data,
+            "can_manage_settings": current_user.can_manage_settings,
+            "can_manage_users": current_user.can_manage_users,
+            "can_view_history": current_user.can_view_history
+        },
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None
+    }
+
+
+@router.patch("/me")
+async def update_current_user(
+        user_data: dict,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """Activate user (only for super admins)"""
-    if not current_user.can_manage_users:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super admins can activate users"
-        )
+    """Обновить свои данные"""
+    # Пользователь может обновить только свои контактные данные
+    if "first_name" in user_data:
+        current_user.first_name = user_data["first_name"]
+    if "last_name" in user_data:
+        current_user.last_name = user_data["last_name"]
+    if "email" in user_data:
+        current_user.email = user_data["email"]
+    if "phone" in user_data:
+        current_user.phone = user_data["phone"]
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-
-    user.is_active = True
     db.commit()
-    db.refresh(user)
-    return user
+
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "id": current_user.id,
+            "first_name": current_user.first_name,
+            "last_name": current_user.last_name,
+            "email": current_user.email,
+            "phone": current_user.phone
+        }
+    }
