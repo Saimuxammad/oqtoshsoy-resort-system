@@ -34,7 +34,6 @@ export const bookingService = {
     try {
       console.log('[BookingService] Creating booking:', booking);
 
-      // Убеждаемся что даты в правильном формате
       const bookingData = {
         ...booking,
         start_date: booking.start_date,
@@ -49,12 +48,11 @@ export const bookingService = {
       return response.data;
     } catch (error) {
       console.error('[BookingService] createBooking error:', error);
-      console.error('[BookingService] Error response:', error.response);
       throw error;
     }
   },
 
-  // Update booking - используем PATCH, с fallback на PUT
+  // Update booking
   updateBooking: async (bookingId, data) => {
     try {
       console.log('[BookingService] Updating booking:', bookingId, data);
@@ -65,7 +63,7 @@ export const bookingService = {
         console.log('[BookingService] Booking updated with PATCH:', response.data);
         return response.data;
       } catch (patchError) {
-        // Если PATCH не поддерживается (405), пробуем PUT
+        // Если PATCH не поддерживается, пробуем PUT
         if (patchError.response?.status === 405) {
           console.log('[BookingService] PATCH not allowed, trying PUT...');
           const response = await api.put(`/bookings/${bookingId}`, data);
@@ -80,11 +78,12 @@ export const bookingService = {
     }
   },
 
-  // Delete booking - упрощенная версия
+  // Delete booking - ИСПРАВЛЕННАЯ версия
   deleteBooking: async (bookingId) => {
     try {
       console.log('[BookingService] Deleting booking:', bookingId);
 
+      // Используем правильный URL с /bookings/ вместо /api/bookings/
       const response = await api.delete(`/bookings/${bookingId}`);
 
       console.log('[BookingService] Delete response:', response.data);
@@ -93,18 +92,17 @@ export const bookingService = {
       console.error('[BookingService] Delete error:', error);
       console.error('[BookingService] Error response:', error.response);
 
-      // Специальная обработка для 405 Method Not Allowed
-      if (error.response?.status === 405) {
-        const errorMsg = 'Server does not support DELETE method. Please check backend configuration.';
-        console.error('[BookingService]', errorMsg);
-        throw new Error(errorMsg);
+      if (error.response?.status === 404) {
+        throw new Error(`Bron #${bookingId} topilmadi`);
+      } else if (error.response?.status === 405) {
+        throw new Error('Server does not support DELETE method');
       }
 
       throw error;
     }
   },
 
-  // Проверка доступности номера для бронирования
+  // Check availability
   checkAvailability: async (roomId, startDate, endDate, excludeBookingId = null) => {
     try {
       const params = new URLSearchParams({

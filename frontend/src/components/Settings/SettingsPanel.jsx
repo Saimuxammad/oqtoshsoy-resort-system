@@ -1,186 +1,345 @@
-import React, { useState } from 'react';
-import { Card, CardHeader, CardContent } from '../UI/Card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '../UI/Card';
 import { Button } from '../UI/Button';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { useTelegram } from '../../hooks/useTelegram';
-import toast from 'react-hot-toast';
 import {
-  LanguageIcon,
+  UserIcon,
   BellIcon,
-  MoonIcon,
-  SunIcon,
-  SwatchIcon
+  LanguageIcon,
+  PaintBrushIcon,
+  ShieldCheckIcon,
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  CogIcon
 } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 export function SettingsPanel() {
-  const { t, language, changeLanguage } = useLanguage();
-  const { user, colorScheme, setHeaderColor, setBackgroundColor } = useTelegram();
-  const [notifications, setNotifications] = React.useState(true);
-  const [theme, setTheme] = React.useState(colorScheme || 'light');
+  const [settings, setSettings] = useState({
+    language: 'uz',
+    notifications: true,
+    emailNotifications: false,
+    telegramNotifications: true,
+    darkMode: false,
+    currency: 'UZS',
+    dateFormat: 'DD.MM.YYYY',
+    autoBackup: true,
+    priceDisplay: 'full'
+  });
 
-  // Предустановленные цветовые темы
-  const colorThemes = [
-    { name: 'Klassik ko\'k', header: '#3b82f6', background: '#ffffff' },
-    { name: 'To\'q ko\'k', header: '#1e40af', background: '#ffffff' },
-    { name: 'Yashil', header: '#059669', background: '#ffffff' },
-    { name: 'Qizil', header: '#dc2626', background: '#ffffff' },
-    { name: 'Binafsha', header: '#7c3aed', background: '#ffffff' },
-    { name: 'Qora', header: '#111827', background: '#ffffff' },
-  ];
+  const [userInfo, setUserInfo] = useState({
+    name: 'Admin',
+    role: 'Administrator',
+    email: 'admin@oqtoshsoy.uz',
+    phone: '+998 90 123 45 67',
+    telegram: '@admin_oqtoshsoy'
+  });
 
-  const applyColorTheme = (theme) => {
-    console.log('[Settings] Applying color theme:', theme);
-
-    // Получаем Telegram WebApp
-    const tg = window.Telegram?.WebApp;
-    if (!tg) {
-      console.error('[Settings] Telegram WebApp not available');
-      return;
+  useEffect(() => {
+    // Load settings from localStorage
+    const saved = localStorage.getItem('app_settings');
+    if (saved) {
+      setSettings(JSON.parse(saved));
     }
+  }, []);
 
-    // Выводим доступные методы
-    console.log('[Settings] Available methods:', {
-      setHeaderColor: !!tg.setHeaderColor,
-      setBackgroundColor: !!tg.setBackgroundColor,
-      setThemeParams: !!tg.setThemeParams,
-      headerColor: tg.headerColor,
-      themeParams: tg.themeParams,
-      version: tg.version
-    });
+  const handleSettingChange = (key, value) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    localStorage.setItem('app_settings', JSON.stringify(newSettings));
+    toast.success('Sozlama saqlandi');
+  };
 
-    // Применяем цвета
-    setHeaderColor(theme.header);
-    setBackgroundColor(theme.background);
+  const handleUserInfoSave = () => {
+    localStorage.setItem('user_info', JSON.stringify(userInfo));
+    toast.success('Foydalanuvchi ma\'lumotlari yangilandi');
+  };
+
+  const handleExportData = () => {
+    // Export all data as JSON
+    const data = {
+      settings,
+      userInfo,
+      exportDate: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `oqtoshsoy_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+
+    toast.success('Ma\'lumotlar eksport qilindi');
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">{t('settings')}</h2>
+      <h2 className="text-2xl font-bold text-gray-900">Sozlamalar</h2>
 
-      {/* Language Settings */}
+      {/* User Profile */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <LanguageIcon className="h-5 w-5 text-gray-600" />
-            <h3 className="text-lg font-medium">{t('language')}</h3>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <UserIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Foydalanuvchi profili</h3>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Button
-              variant={language === 'uz' ? 'primary' : 'secondary'}
-              onClick={() => changeLanguage('uz')}
-            >
-              O'zbek
-            </Button>
-            <Button
-              variant={language === 'ru' ? 'primary' : 'secondary'}
-              onClick={() => changeLanguage('ru')}
-            >
-              Русский
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Color Theme Settings */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <SwatchIcon className="h-5 w-5 text-gray-600" />
-            <h3 className="text-lg font-medium">Rang sozlamalari</h3>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3">
-            {colorThemes.map((theme) => (
-              <button
-                key={theme.name}
-                onClick={() => applyColorTheme(theme)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ism</label>
+              <input
+                type="text"
+                value={userInfo.name}
+                onChange={(e) => setUserInfo({ ...userInfo, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+              <select
+                value={userInfo.role}
+                onChange={(e) => setUserInfo({ ...userInfo, role: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <div
-                  className="w-4 h-4 rounded-full border border-gray-300"
-                  style={{ backgroundColor: theme.header }}
-                />
-                <span className="text-sm text-gray-700">{theme.name}</span>
-              </button>
-            ))}
+                <option value="Administrator">Administrator</option>
+                <option value="Manager">Menejer</option>
+                <option value="Operator">Operator</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={userInfo.email}
+                onChange={(e) => setUserInfo({ ...userInfo, email: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+              <input
+                type="tel"
+                value={userInfo.phone}
+                onChange={(e) => setUserInfo({ ...userInfo, phone: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telegram</label>
+              <input
+                type="text"
+                value={userInfo.telegram}
+                onChange={(e) => setUserInfo({ ...userInfo, telegram: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <Button onClick={handleUserInfoSave} className="mt-4">
+            Saqlash
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Notifications */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <BellIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Bildirishnomalar</h3>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Bildirishnomalarni yoqish</span>
+              <input
+                type="checkbox"
+                checked={settings.notifications}
+                onChange={(e) => handleSettingChange('notifications', e.target.checked)}
+                className="toggle"
+              />
+            </label>
+
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Email bildirishnomalar</span>
+              <input
+                type="checkbox"
+                checked={settings.emailNotifications}
+                onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
+                className="toggle"
+              />
+            </label>
+
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Telegram bildirishnomalar</span>
+              <input
+                type="checkbox"
+                checked={settings.telegramNotifications}
+                onChange={(e) => handleSettingChange('telegramNotifications', e.target.checked)}
+                className="toggle"
+              />
+            </label>
           </div>
         </CardContent>
       </Card>
 
-      {/* Notification Settings */}
+      {/* System Settings */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <BellIcon className="h-5 w-5 text-gray-600" />
-            <h3 className="text-lg font-medium">{t('notifications')}</h3>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <CogIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Tizim sozlamalari</h3>
           </div>
-        </CardHeader>
-        <CardContent>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={notifications}
-              onChange={(e) => setNotifications(e.target.checked)}
-              className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-            />
-            <span className="text-sm text-gray-700">{t('enableNotifications')}</span>
-          </label>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <LanguageIcon className="h-4 w-4 inline mr-1" />
+                Til
+              </label>
+              <select
+                value={settings.language}
+                onChange={(e) => handleSettingChange('language', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="uz">O'zbekcha</option>
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <CurrencyDollarIcon className="h-4 w-4 inline mr-1" />
+                Valyuta
+              </label>
+              <select
+                value={settings.currency}
+                onChange={(e) => handleSettingChange('currency', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="UZS">UZS (so'm)</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sana formati
+              </label>
+              <select
+                value={settings.dateFormat}
+                onChange={(e) => handleSettingChange('dateFormat', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="DD.MM.YYYY">DD.MM.YYYY</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Narx ko'rinishi
+              </label>
+              <select
+                value={settings.priceDisplay}
+                onChange={(e) => handleSettingChange('priceDisplay', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="full">To'liq (1,000,000)</option>
+                <option value="short">Qisqa (1M)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Avtomatik zahira nusxa</span>
+              <input
+                type="checkbox"
+                checked={settings.autoBackup}
+                onChange={(e) => handleSettingChange('autoBackup', e.target.checked)}
+                className="toggle"
+              />
+            </label>
+
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Qorong'u rejim</span>
+              <input
+                type="checkbox"
+                checked={settings.darkMode}
+                onChange={(e) => handleSettingChange('darkMode', e.target.checked)}
+                className="toggle"
+              />
+            </label>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Theme Settings */}
+      {/* Data Management */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            {theme === 'light' ? (
-              <SunIcon className="h-5 w-5 text-gray-600" />
-            ) : (
-              <MoonIcon className="h-5 w-5 text-gray-600" />
-            )}
-            <h3 className="text-lg font-medium">{t('theme')}</h3>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <DocumentTextIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Ma'lumotlarni boshqarish</h3>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Button
-              variant={theme === 'light' ? 'primary' : 'secondary'}
-              onClick={() => setTheme('light')}
-            >
-              <SunIcon className="h-4 w-4 mr-2" />
-              {t('lightTheme')}
+
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleExportData} variant="secondary">
+              Ma'lumotlarni eksport qilish
             </Button>
+
+            <Button variant="secondary" onClick={() => toast.info('Import funksiyasi tez orada')}>
+              Ma'lumotlarni import qilish
+            </Button>
+
             <Button
-              variant={theme === 'dark' ? 'primary' : 'secondary'}
-              onClick={() => setTheme('dark')}
+              variant="danger"
+              onClick={() => {
+                if (window.confirm('Barcha ma\'lumotlar o\'chiriladi. Davom etasizmi?')) {
+                  localStorage.clear();
+                  toast.success('Barcha ma\'lumotlar tozalandi');
+                  window.location.reload();
+                }
+              }}
             >
-              <MoonIcon className="h-4 w-4 mr-2" />
-              {t('darkTheme')}
+              Keshni tozalash
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* User Info */}
+      {/* System Info */}
       <Card>
-        <CardHeader>
-          <h3 className="text-lg font-medium">{t('user')}</h3>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">ID:</span> {user?.id}
-            </p>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Name:</span> {user?.first_name} {user?.last_name || ''}
-            </p>
-            {user?.username && (
-              <p className="text-sm text-gray-600">
-                <span className="font-medium">Username:</span> @{user.username}
-              </p>
-            )}
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <ShieldCheckIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Tizim haqida</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-600">Versiya:</span>
+              <span className="ml-2 font-medium">2.0.0</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Oxirgi yangilanish:</span>
+              <span className="ml-2 font-medium">03.09.2025</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Server holati:</span>
+              <span className="ml-2 font-medium text-green-600">Faol</span>
+            </div>
+            <div>
+              <span className="text-gray-600">API versiyasi:</span>
+              <span className="ml-2 font-medium">v2</span>
+            </div>
           </div>
         </CardContent>
       </Card>

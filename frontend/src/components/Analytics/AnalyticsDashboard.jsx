@@ -1,224 +1,269 @@
-import React, { useState } from 'react';
-import { useQuery } from 'react-query';
-import { Card, CardHeader, CardContent } from '../UI/Card';
-import { Button } from '../UI/Button';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '../UI/Card';
 import { Loading } from '../UI/Loading';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { analyticsService } from '../../services/analyticsService';
-import {
-  ChartBarIcon,
-  ArrowTrendingUpIcon,
-  CalendarDaysIcon,
-  ArrowDownTrayIcon
-} from '@heroicons/react/24/outline';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-} from 'chart.js';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+import { ArrowUpIcon, ArrowDownIcon, UsersIcon, HomeIcon, CurrencyDollarIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import api from '../../services/api';
 
 export function AnalyticsDashboard() {
-  const { t } = useLanguage();
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setDate(new Date().getDate() - 30)),
-    end: new Date()
-  });
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const { data: occupancyStats, isLoading: occupancyLoading } = useQuery(
-    ['analytics', 'occupancy', dateRange],
-    () => analyticsService.getOccupancyStats(dateRange.start, dateRange.end)
-  );
+  useEffect(() => {
+    loadAnalytics();
+  }, []);
 
-  const { data: roomTypeStats } = useQuery(
-    ['analytics', 'roomTypes', dateRange],
-    () => analyticsService.getRoomTypeStats(dateRange.start, dateRange.end)
-  );
+  const loadAnalytics = async () => {
+    try {
+      setLoading(true);
 
-  const { data: trends } = useQuery(
-    ['analytics', 'trends'],
-    () => analyticsService.getBookingTrends(6)
-  );
+      // Загружаем данные о комнатах и бронированиях
+      const [roomsRes, bookingsRes] = await Promise.all([
+        api.get('/rooms'),
+        api.get('/bookings')
+      ]);
 
-  const handleExport = async () => {
-    const response = await analyticsService.exportAnalytics(dateRange.start, dateRange.end);
-    const blob = new Blob([response], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analytics_${dateRange.start.toISOString().split('T')[0]}_${dateRange.end.toISOString().split('T')[0]}.xlsx`;
-    a.click();
+      const rooms = roomsRes.data || [];
+      const bookings = bookingsRes.data || [];
+
+      // Считаем статистику
+      const today = new Date().toISOString().split('T')[0];
+      const occupiedRooms = bookings.filter(b =>
+        b.start_date <= today && b.end_date >= today
+      ).length;
+
+      // Группируем комнаты по типам
+      const roomTypes = {};
+      rooms.forEach(room => {
+        if (!roomTypes[room.room_type]) {
+          roomTypes[room.room_type] = { total: 0, occupied: 0, revenue: 0 };
+        }
+        roomTypes[room.room_type].total++;
+        roomTypes[room.room_type].revenue += room.price_per_night || 0;
+      });
+
+      // Считаем занятость по типам
+      bookings.forEach(booking => {
+        const room = rooms.find(r => r.id === booking.room_id);
+        if (room && roomTypes[room.room_type]) {
+          if (booking.start_date <= today && booking.end_date >= today) {
+            roomTypes[room.room_type].occupied++;
+          }
+        }
+      });
+
+      // Подготовка данных для графиков
+      const roomTypeData = Object.entries(roomTypes).map(([type, data]) => ({
+        name: type.replace("o'rinli", "o'r"),
+        total: data.total,
+        band: data.occupied,
+        bo'sh: data.total - data.occupied
+      }));
+
+      // Данные по месяцам (последние 6 месяцев)
+      const monthlyData = [];
+      const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+      const currentMonth = new Date().getMonth();
+
+      for (let i = 5; i >= 0; i--) {
+        const monthIndex = (currentMonth - i + 12) % 12;
+        const monthBookings = bookings.filter(b => {
+          const bookingMonth = new Date(b.start_date).getMonth();
+          return bookingMonth === monthIndex;
+        });
+
+        monthlyData.push({
+          name: months[monthIndex].substring(0, 3),
+          bronlar: monthBookings.length,
+          daromad: monthBookings.length * 500000 // Примерная цена
+        });
+      }
+
+      setStats({
+        totalRooms: rooms.length,
+        occupiedRooms,
+        occupancyRate: Math.round((occupiedRooms / rooms.length) * 100),
+        totalBookings: bookings.length,
+        monthlyRevenue: bookings.length * 500000,
+        roomTypeData,
+        monthlyData
+      });
+
+    } catch (error) {
+      console.error('Analytics error:', error);
+      setStats({
+        totalRooms: 0,
+        occupiedRooms: 0,
+        occupancyRate: 0,
+        totalBookings: 0,
+        monthlyRevenue: 0,
+        roomTypeData: [],
+        monthlyData: []
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (occupancyLoading) return <Loading />;
+  if (loading) return <Loading />;
+  if (!stats) return <div>Ma'lumotlar yuklanmadi</div>;
 
-  // Prepare chart data
-  const occupancyChartData = {
-    labels: occupancyStats?.daily_stats?.map(stat =>
-      new Date(stat.date).toLocaleDateString()
-    ) || [],
-    datasets: [{
-      label: t('occupancyStats'),
-      data: occupancyStats?.daily_stats?.map(stat => stat.occupancy_rate) || [],
-      borderColor: 'rgb(59, 130, 246)',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-      tension: 0.3
-    }]
-  };
-
-  const roomTypeChartData = {
-    labels: roomTypeStats?.map(stat => stat.room_type) || [],
-    datasets: [{
-      label: t('occupancyStats'),
-      data: roomTypeStats?.map(stat => stat.occupancy_rate) || [],
-      backgroundColor: [
-        'rgba(255, 99, 132, 0.5)',
-        'rgba(54, 162, 235, 0.5)',
-        'rgba(255, 206, 86, 0.5)',
-        'rgba(75, 192, 192, 0.5)',
-        'rgba(153, 102, 255, 0.5)',
-        'rgba(255, 159, 64, 0.5)',
-      ]
-    }]
-  };
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900">{t('analytics')}</h2>
-        <Button onClick={handleExport} variant="secondary">
-          <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-          {t('exportExcel')}
-        </Button>
+      <h2 className="text-2xl font-bold text-gray-900">Tahlil va Statistika</h2>
+
+      {/* Asosiy ko'rsatkichlar */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Jami xonalar</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalRooms}</p>
+              </div>
+              <HomeIcon className="h-10 w-10 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Band xonalar</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.occupiedRooms}</p>
+                <p className="text-xs text-gray-500 mt-1">{stats.occupancyRate}% bandlik</p>
+              </div>
+              <UsersIcon className="h-10 w-10 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Jami bronlar</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalBookings}</p>
+              </div>
+              <CalendarDaysIcon className="h-10 w-10 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Oylik daromad</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {(stats.monthlyRevenue / 1000000).toFixed(1)}M
+                </p>
+                <p className="text-xs text-gray-500">so'm</p>
+              </div>
+              <CurrencyDollarIcon className="h-10 w-10 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">{t('averageOccupancy')}</p>
-                <p className="text-3xl font-semibold text-gray-900">
-                  {occupancyStats?.average_occupancy?.toFixed(1) || '0.0'}%
-                </p>
-              </div>
-              <ChartBarIcon className="h-8 w-8 text-primary-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">{t('totalRevenue')}</p>
-                <p className="text-3xl font-semibold text-gray-900">
-                  {(12500000).toLocaleString()} UZS
-                </p>
-              </div>
-              <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">{t('occupied')}</p>
-                <p className="text-3xl font-semibold text-gray-900">
-                  {occupancyStats?.daily_stats?.[occupancyStats.daily_stats.length - 1]?.occupied || 0}
-                </p>
-              </div>
-              <CalendarDaysIcon className="h-8 w-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
+      {/* Grafiklar */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Xonalar bo'yicha statistika */}
         <Card>
-          <CardHeader>
-            <h3 className="text-lg font-medium">{t('dailyStats')}</h3>
-          </CardHeader>
-          <CardContent>
-            <Line data={occupancyChartData} options={{
-              responsive: true,
-              plugins: {
-                legend: { display: false }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  max: 100
-                }
-              }
-            }} />
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Xonalar holati</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={stats.roomTypeData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="band" fill="#3B82F6" name="Band" />
+                <Bar dataKey="bo'sh" fill="#10B981" name="Bo'sh" />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
+        {/* Oylik trend */}
         <Card>
-          <CardHeader>
-            <h3 className="text-lg font-medium">{t('roomTypeStats')}</h3>
-          </CardHeader>
-          <CardContent>
-            <Doughnut data={roomTypeChartData} options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'bottom' }
-              }
-            }} />
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Oylik dinamika</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={stats.monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="bronlar" stroke="#8B5CF6" name="Bronlar" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Xona turlari bo'yicha ulush */}
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Xona turlari ulushi</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={stats.roomTypeData}
+                  dataKey="total"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label
+                >
+                  {stats.roomTypeData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Statistika jadvali */}
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Xona turlari statistikasi</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Turi</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Jami</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Band</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bo'sh</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bandlik %</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {stats.roomTypeData.map((type, index) => (
+                    <tr key={index}>
+                      <td className="px-4 py-2 text-sm text-gray-900">{type.name}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{type.total}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{type.band}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{type.bo'sh}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">
+                        {type.total > 0 ? Math.round((type.band / type.total) * 100) : 0}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Trends */}
-      {trends && (
-        <Card>
-          <CardHeader>
-            <h3 className="text-lg font-medium">{t('trends')}</h3>
-          </CardHeader>
-          <CardContent>
-            <Bar data={{
-              labels: trends.map(t => t.month),
-              datasets: [{
-                label: t('bookings'),
-                data: trends.map(t => t.bookings_count),
-                backgroundColor: 'rgba(59, 130, 246, 0.5)'
-              }]
-            }} options={{
-              responsive: true,
-              plugins: {
-                legend: { display: false }
-              }
-            }} />
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
