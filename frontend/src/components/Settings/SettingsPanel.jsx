@@ -9,16 +9,11 @@ import {
   ShieldCheckIcon,
   CurrencyDollarIcon,
   DocumentTextIcon,
-  CogIcon,
-  UserGroupIcon,
-  PhotoIcon
+  CogIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { UserManagement } from './UserManagement';
-import { LogoUpload } from './LogoUpload';
 
 export function SettingsPanel() {
-  const [activeTab, setActiveTab] = useState('profile');
   const [settings, setSettings] = useState({
     language: 'uz',
     notifications: true,
@@ -77,300 +72,248 @@ export function SettingsPanel() {
     toast.success('Ma\'lumotlar eksport qilindi');
   };
 
-  // Tabs
-  const tabs = [
-    { id: 'profile', name: 'Profil', icon: UserIcon },
-    { id: 'users', name: 'Foydalanuvchilar', icon: UserGroupIcon },
-    { id: 'logo', name: 'Logo', icon: PhotoIcon },
-    { id: 'notifications', name: 'Bildirishnomalar', icon: BellIcon },
-    { id: 'system', name: 'Tizim', icon: CogIcon },
-    { id: 'data', name: "Ma'lumotlar", icon: DocumentTextIcon }
-  ];
-
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Sozlamalar</h2>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center py-2 px-1 border-b-2 font-medium text-sm
-                  ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }
-                `}
+      {/* User Profile */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <UserIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Foydalanuvchi profili</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ism</label>
+              <input
+                type="text"
+                value={userInfo.name}
+                onChange={(e) => setUserInfo({ ...userInfo, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+              <select
+                value={userInfo.role}
+                onChange={(e) => setUserInfo({ ...userInfo, role: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <Icon className="h-5 w-5 mr-2" />
-                {tab.name}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+                <option value="Administrator">Administrator</option>
+                <option value="Manager">Menejer</option>
+                <option value="Operator">Operator</option>
+              </select>
+            </div>
 
-      {/* Content */}
-      <div>
-        {/* User Profile Tab */}
-        {activeTab === 'profile' && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center mb-4">
-                <UserIcon className="h-6 w-6 mr-2 text-gray-600" />
-                <h3 className="text-lg font-semibold">Foydalanuvchi profili</h3>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={userInfo.email}
+                onChange={(e) => setUserInfo({ ...userInfo, email: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ism</label>
-                  <input
-                    type="text"
-                    value={userInfo.name}
-                    onChange={(e) => setUserInfo({ ...userInfo, name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+              <input
+                type="tel"
+                value={userInfo.phone}
+                onChange={(e) => setUserInfo({ ...userInfo, phone: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-                  <select
-                    value={userInfo.role}
-                    onChange={(e) => setUserInfo({ ...userInfo, role: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Administrator">Administrator</option>
-                    <option value="Manager">Menejer</option>
-                    <option value="Operator">Operator</option>
-                  </select>
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telegram</label>
+              <input
+                type="text"
+                value={userInfo.telegram}
+                onChange={(e) => setUserInfo({ ...userInfo, telegram: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={userInfo.email}
-                    onChange={(e) => setUserInfo({ ...userInfo, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+          <Button onClick={handleUserInfoSave} className="mt-4">
+            Saqlash
+          </Button>
+        </CardContent>
+      </Card>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-                  <input
-                    type="tel"
-                    value={userInfo.phone}
-                    onChange={(e) => setUserInfo({ ...userInfo, phone: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+      {/* Notifications */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <BellIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Bildirishnomalar</h3>
+          </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Telegram</label>
-                  <input
-                    type="text"
-                    value={userInfo.telegram}
-                    onChange={(e) => setUserInfo({ ...userInfo, telegram: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+          <div className="space-y-3">
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Bildirishnomalarni yoqish</span>
+              <input
+                type="checkbox"
+                checked={settings.notifications}
+                onChange={(e) => handleSettingChange('notifications', e.target.checked)}
+                className="toggle"
+              />
+            </label>
 
-              <Button onClick={handleUserInfoSave} className="mt-4">
-                Saqlash
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Email bildirishnomalar</span>
+              <input
+                type="checkbox"
+                checked={settings.emailNotifications}
+                onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
+                className="toggle"
+              />
+            </label>
 
-        {/* Users Management Tab */}
-        {activeTab === 'users' && <UserManagement />}
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Telegram bildirishnomalar</span>
+              <input
+                type="checkbox"
+                checked={settings.telegramNotifications}
+                onChange={(e) => handleSettingChange('telegramNotifications', e.target.checked)}
+                className="toggle"
+              />
+            </label>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Logo Upload Tab */}
-        {activeTab === 'logo' && <LogoUpload />}
+      {/* System Settings */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <CogIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Tizim sozlamalari</h3>
+          </div>
 
-        {/* Notifications Tab */}
-        {activeTab === 'notifications' && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center mb-4">
-                <BellIcon className="h-6 w-6 mr-2 text-gray-600" />
-                <h3 className="text-lg font-semibold">Bildirishnomalar</h3>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <LanguageIcon className="h-4 w-4 inline mr-1" />
+                Til
+              </label>
+              <select
+                value={settings.language}
+                onChange={(e) => handleSettingChange('language', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="uz">O'zbekcha</option>
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+              </select>
+            </div>
 
-              <div className="space-y-3">
-                <label className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Bildirishnomalarni yoqish</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.notifications}
-                    onChange={(e) => handleSettingChange('notifications', e.target.checked)}
-                    className="toggle"
-                  />
-                </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <CurrencyDollarIcon className="h-4 w-4 inline mr-1" />
+                Valyuta
+              </label>
+              <select
+                value={settings.currency}
+                onChange={(e) => handleSettingChange('currency', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="UZS">UZS (so'm)</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+              </select>
+            </div>
 
-                <label className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Email bildirishnomalar</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.emailNotifications}
-                    onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
-                    className="toggle"
-                  />
-                </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sana formati
+              </label>
+              <select
+                value={settings.dateFormat}
+                onChange={(e) => handleSettingChange('dateFormat', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="DD.MM.YYYY">DD.MM.YYYY</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              </select>
+            </div>
 
-                <label className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Telegram bildirishnomalar</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.telegramNotifications}
-                    onChange={(e) => handleSettingChange('telegramNotifications', e.target.checked)}
-                    className="toggle"
-                  />
-                </label>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Narx ko'rinishi
+              </label>
+              <select
+                value={settings.priceDisplay}
+                onChange={(e) => handleSettingChange('priceDisplay', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="full">To'liq (1,000,000)</option>
+                <option value="short">Qisqa (1M)</option>
+              </select>
+            </div>
+          </div>
 
-        {/* System Settings Tab */}
-        {activeTab === 'system' && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center mb-4">
-                <CogIcon className="h-6 w-6 mr-2 text-gray-600" />
-                <h3 className="text-lg font-semibold">Tizim sozlamalari</h3>
-              </div>
+          <div className="mt-4 space-y-3">
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Avtomatik zahira nusxa</span>
+              <input
+                type="checkbox"
+                checked={settings.autoBackup}
+                onChange={(e) => handleSettingChange('autoBackup', e.target.checked)}
+                className="toggle"
+              />
+            </label>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <LanguageIcon className="h-4 w-4 inline mr-1" />
-                    Til
-                  </label>
-                  <select
-                    value={settings.language}
-                    onChange={(e) => handleSettingChange('language', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="uz">O'zbekcha</option>
-                    <option value="ru">Русский</option>
-                    <option value="en">English</option>
-                  </select>
-                </div>
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Qorong'u rejim</span>
+              <input
+                type="checkbox"
+                checked={settings.darkMode}
+                onChange={(e) => handleSettingChange('darkMode', e.target.checked)}
+                className="toggle"
+              />
+            </label>
+          </div>
+        </CardContent>
+      </Card>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <CurrencyDollarIcon className="h-4 w-4 inline mr-1" />
-                    Valyuta
-                  </label>
-                  <select
-                    value={settings.currency}
-                    onChange={(e) => handleSettingChange('currency', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="UZS">UZS (so'm)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                  </select>
-                </div>
+      {/* Data Management */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <DocumentTextIcon className="h-6 w-6 mr-2 text-gray-600" />
+            <h3 className="text-lg font-semibold">Ma'lumotlarni boshqarish</h3>
+          </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sana formati
-                  </label>
-                  <select
-                    value={settings.dateFormat}
-                    onChange={(e) => handleSettingChange('dateFormat', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="DD.MM.YYYY">DD.MM.YYYY</option>
-                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                  </select>
-                </div>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleExportData} variant="secondary">
+              Ma'lumotlarni eksport qilish
+            </Button>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Narx ko'rinishi
-                  </label>
-                  <select
-                    value={settings.priceDisplay}
-                    onChange={(e) => handleSettingChange('priceDisplay', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="full">To'liq (1,000,000)</option>
-                    <option value="short">Qisqa (1M)</option>
-                  </select>
-                </div>
-              </div>
+            <Button variant="secondary" onClick={() => toast.info('Import funksiyasi tez orada')}>
+              Ma'lumotlarni import qilish
+            </Button>
 
-              <div className="mt-4 space-y-3">
-                <label className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Avtomatik zahira nusxa</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.autoBackup}
-                    onChange={(e) => handleSettingChange('autoBackup', e.target.checked)}
-                    className="toggle"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Qorong'u rejim</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.darkMode}
-                    onChange={(e) => handleSettingChange('darkMode', e.target.checked)}
-                    className="toggle"
-                  />
-                </label>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Data Management Tab */}
-        {activeTab === 'data' && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center mb-4">
-                <DocumentTextIcon className="h-6 w-6 mr-2 text-gray-600" />
-                <h3 className="text-lg font-semibold">Ma'lumotlarni boshqarish</h3>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={handleExportData} variant="secondary">
-                  Ma'lumotlarni eksport qilish
-                </Button>
-
-                <Button variant="secondary" onClick={() => toast.info('Import funksiyasi tez orada')}>
-                  Ma'lumotlarni import qilish
-                </Button>
-
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    if (window.confirm('Barcha ma\'lumotlar o\'chiriladi. Davom etasizmi?')) {
-                      localStorage.clear();
-                      toast.success('Barcha ma\'lumotlar tozalandi');
-                      window.location.reload();
-                    }
-                  }}
-                >
-                  Keshni tozalash
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (window.confirm('Barcha ma\'lumotlar o\'chiriladi. Davom etasizmi?')) {
+                  localStorage.clear();
+                  toast.success('Barcha ma\'lumotlar tozalandi');
+                  window.location.reload();
+                }
+              }}
+            >
+              Keshni tozalash
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* System Info */}
       <Card>
