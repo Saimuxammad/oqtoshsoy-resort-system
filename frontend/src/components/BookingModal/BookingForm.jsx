@@ -1,117 +1,134 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../UI/Button';
-import { DatePicker } from './DatePicker';
-import { TrashIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
+import toast from 'react-hot-toast';
+import { bookingService } from '../../services/bookingService';
 
-export function BookingForm({ room, booking, onSubmit, onCancel, onDelete, onExtend, isLoading }) {
+export function BookingForm({ room, booking, onSubmit, onCancel, onDelete, isLoading }) {
   const [formData, setFormData] = useState({
-    start_date: booking?.start_date ? new Date(booking.start_date) : new Date(),
-    end_date: booking?.end_date ? new Date(booking.end_date) : new Date(),
+    room_id: room?.id || '',
+    start_date: booking?.start_date || '',
+    end_date: booking?.end_date || '',
     guest_name: booking?.guest_name || '',
     notes: booking?.notes || ''
   });
 
-  const [isExtending, setIsExtending] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
-  // Если режим продления, устанавливаем начальную дату на следующий день после окончания
   useEffect(() => {
-    if (isExtending && booking) {
-      const nextDay = new Date(booking.end_date);
-      nextDay.setDate(nextDay.getDate() + 1);
-
-      const endDay = new Date(nextDay);
-      endDay.setDate(endDay.getDate() + 1); // По умолчанию 1 день
-
-      setFormData({
-        start_date: nextDay,
-        end_date: endDay,
-        guest_name: booking.guest_name || '',
-        notes: booking.notes ? `${booking.notes} (davomi)` : 'Davomi'
-      });
+    if (room) {
+      setFormData(prev => ({ ...prev, room_id: room.id }));
     }
-  }, [isExtending, booking]);
+  }, [room]);
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const checkAvailability = async () => {
+    if (!formData.start_date || !formData.end_date) {
+      return true; // Пропускаем проверку если даты не выбраны
+    }
+
+    try {
+      setIsChecking(true);
+      const result = await bookingService.checkAvailability(
+        formData.room_id,
+        formData.start_date,
+        formData.end_date,
+        booking?.id // Исключаем текущее бронирование при редактировании
+      );
+
+      console.log('Availability check result:', result);
+      return result.available;
+    } catch (error) {
+      console.error('Availability check error:', error);
+      // При ошибке проверки разрешаем отправку на сервер
+      // Сервер сам проверит и вернет ошибку если нужно
+      return true;
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Проверяем даты
-    if (formData.end_date < formData.start_date) {
-      alert('Chiqish sanasi kirish sanasidan keyin bo\'lishi kerak');
+    // Валидация
+    if (!formData.start_date || !formData.end_date) {
+      toast.error('Sanalarni tanlang');
       return;
     }
 
-    const submitData = {
-      ...formData,
-      room_id: room.id,
-      start_date: formData.start_date.toISOString().split('T')[0],
-      end_date: formData.end_date.toISOString().split('T')[0]
-    };
-
-    console.log('BookingForm submitting:', { isExtending, submitData });
-
-    // При продлении всегда создаем новое бронирование
-    if (isExtending) {
-      // Передаем данные для создания нового бронирования
-      onSubmit(submitData, true); // true означает, что это продление
-    } else {
-      onSubmit(submitData, false);
+    if (new Date(formData.end_date) <= new Date(formData.start_date)) {
+      toast.error('Tugash sanasi boshlanish sanasidan keyin bo\'lishi kerak');
+      return;
     }
-  };
 
-  const handleExtendClick = () => {
-    setIsExtending(true);
-  };
+    // Проверяем доступность
+    const isAvailable = await checkAvailability();
 
-  const handleCancelExtend = () => {
-    setIsExtending(false);
-    // Восстанавливаем оригинальные данные
-    if (booking) {
-      setFormData({
-        start_date: new Date(booking.start_date),
-        end_date: new Date(booking.end_date),
-        guest_name: booking.guest_name || '',
-        notes: booking.notes || ''
-      });
+    if (!isAvailable && !booking) {
+      // Только для новых бронирований показываем предупреждение
+      // При редактировании пропускаем, так как может быть то же бронирование
+      const confirmBooking = window.confirm(
+        'Bu sanalar uchun xona band ko\'rinadi. Davom etasizmi?\n' +
+        '(Sistema yangi qoidalar bilan ishlayapti: chiqish va kirish bir kunda bo\'lishi mumkin)'
+      );
+
+      if (!confirmBooking) {
+        return;
+      }
     }
+
+    onSubmit(formData);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-gray-50 p-3 rounded-lg">
-        <p className="text-sm text-gray-600">
-          Xona: <span className="font-medium">№{room.room_number}</span>
-        </p>
-        <p className="text-sm text-gray-600">
-          Turi: <span className="font-medium">{room.room_type}</span>
-        </p>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Xona
+        </label>
+        <input
+          type="text"
+          value={`№${room?.room_number} - ${room?.room_type}`}
+          disabled
+          className="w-full px-3 py-2 border rounded-lg bg-gray-50"
+        />
       </div>
 
-      {isExtending && (
-        <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-          <p className="text-sm text-blue-800 font-medium">
-            Bronni davom ettirish
-          </p>
-          <p className="text-xs text-blue-600 mt-1">
-            Yangi bron avvalgi brondan keyin boshlanadi
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-4">
-        <DatePicker
-          label="Kirish sanasi"
-          selected={formData.start_date}
-          onChange={(date) => setFormData({ ...formData, start_date: date })}
-          minDate={isExtending ? formData.start_date : new Date()}
-          disabled={isExtending}
-        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Kirish sanasi
+          </label>
+          <input
+            type="date"
+            name="start_date"
+            value={formData.start_date}
+            onChange={handleChange}
+            min={format(new Date(), 'yyyy-MM-dd')}
+            required
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
-        <DatePicker
-          label="Chiqish sanasi"
-          selected={formData.end_date}
-          onChange={(date) => setFormData({ ...formData, end_date: date })}
-          minDate={formData.start_date}
-        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Chiqish sanasi
+          </label>
+          <input
+            type="date"
+            name="end_date"
+            value={formData.end_date}
+            onChange={handleChange}
+            min={formData.start_date || format(new Date(), 'yyyy-MM-dd')}
+            required
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
       </div>
 
       <div>
@@ -120,10 +137,11 @@ export function BookingForm({ room, booking, onSubmit, onCancel, onDelete, onExt
         </label>
         <input
           type="text"
+          name="guest_name"
           value={formData.guest_name}
-          onChange={(e) => setFormData({ ...formData, guest_name: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          onChange={handleChange}
           placeholder="Mehmon ismi (ixtiyoriy)"
+          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
@@ -132,54 +150,55 @@ export function BookingForm({ room, booking, onSubmit, onCancel, onDelete, onExt
           Izohlar
         </label>
         <textarea
+          name="notes"
           value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          onChange={handleChange}
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Qo'shimcha ma'lumotlar (ixtiyoriy)"
+          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="flex gap-3 pt-4">
-        <Button
-          type="submit"
-          className="flex-1"
-          loading={isLoading}
-        >
-          {isExtending ? 'Davom ettirish' : (booking ? 'Yangilash' : 'Saqlash')}
-        </Button>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+        <p className="font-medium mb-1">Eslatma:</p>
+        <ul className="list-disc list-inside space-y-1 text-xs">
+          <li>Kirish vaqti: 14:00</li>
+          <li>Chiqish vaqti: 12:00</li>
+          <li>Bir kunda chiqish va kirish mumkin</li>
+        </ul>
+      </div>
 
-        {booking && !isExtending && (
-          <>
+      <div className="flex justify-between gap-3">
+        <div className="flex gap-3">
+          {booking && onDelete && (
             <Button
               type="button"
-              variant="secondary"
-              onClick={handleExtendClick}
-              title="Bronni davom ettirish"
+              variant="danger"
+              onClick={onDelete}
+              disabled={isLoading}
             >
-              <ArrowRightIcon className="h-4 w-4" />
+              O'chirish
             </Button>
+          )}
+        </div>
 
-            {onDelete && (
-              <Button
-                type="button"
-                variant="danger"
-                onClick={onDelete}
-                title="Bronni o'chirish"
-              >
-                <TrashIcon className="h-4 w-4" />
-              </Button>
-            )}
-          </>
-        )}
-
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={isExtending ? handleCancelExtend : onCancel}
-        >
-          Bekor qilish
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={isLoading || isChecking}
+          >
+            Bekor qilish
+          </Button>
+          <Button
+            type="submit"
+            loading={isLoading || isChecking}
+            disabled={isLoading || isChecking}
+          >
+            {isChecking ? 'Tekshirilmoqda...' : (booking ? 'Yangilash' : 'Saqlash')}
+          </Button>
+        </div>
       </div>
     </form>
   );

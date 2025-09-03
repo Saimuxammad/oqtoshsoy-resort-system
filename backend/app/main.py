@@ -568,5 +568,94 @@ async def fix_room_types(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/test-booking-conflicts")
+async def test_booking_conflicts(
+        room_id: int,
+        start_date: date,
+        end_date: date,
+        db: Session = Depends(get_db)
+):
+    """Тестовый эндпоинт для отладки конфликтов бронирования"""
+    try:
+        from sqlalchemy import text
+
+        # Получаем все бронирования для этой комнаты
+        all_bookings = db.execute(text("""
+                                       SELECT id, room_id, start_date, end_date, guest_name
+                                       FROM bookings
+                                       WHERE room_id = :room_id
+                                       ORDER BY start_date
+                                       """), {"room_id": room_id})
+
+        bookings_list = []
+        for b in all_bookings:
+            bookings_list.append({
+                "id": b.id,
+                "start_date": str(b.start_date),
+                "end_date": str(b.end_date),
+                "guest_name": b.guest_name
+            })
+
+        # Проверяем конфликты со старой логикой (<=, >=)
+        old_conflicts = db.execute(text("""
+                                        SELECT id, start_date, end_date
+                                        FROM bookings
+                                        WHERE room_id = :room_id
+                                          AND start_date <= :end_date
+                                          AND end_date >= :start_date
+                                        """), {
+                                       "room_id": room_id,
+                                       "start_date": start_date,
+                                       "end_date": end_date
+                                   })
+
+        old_conflicts_list = []
+        for c in old_conflicts:
+            old_conflicts_list.append({
+                "id": c.id,
+                "start_date": str(c.start_date),
+                "end_date": str(c.end_date)
+            })
+
+        # Проверяем конфликты с новой логикой (<, >)
+        new_conflicts = db.execute(text("""
+                                        SELECT id, start_date, end_date
+                                        FROM bookings
+                                        WHERE room_id = :room_id
+                                          AND start_date < :end_date
+                                          AND end_date > :start_date
+                                        """), {
+                                       "room_id": room_id,
+                                       "start_date": start_date,
+                                       "end_date": end_date
+                                   })
+
+        new_conflicts_list = []
+        for c in new_conflicts:
+            new_conflicts_list.append({
+                "id": c.id,
+                "start_date": str(c.start_date),
+                "end_date": str(c.end_date)
+            })
+
+        return {
+            "requested_booking": {
+                "room_id": room_id,
+                "start_date": str(start_date),
+                "end_date": str(end_date)
+            },
+            "existing_bookings": bookings_list,
+            "old_logic_conflicts": old_conflicts_list,
+            "new_logic_conflicts": new_conflicts_list,
+            "old_logic_available": len(old_conflicts_list) == 0,
+            "new_logic_available": len(new_conflicts_list) == 0,
+            "recommendation": "Use new logic - allows same day checkout/checkin" if len(
+                new_conflicts_list) == 0 else "Room not available"
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
