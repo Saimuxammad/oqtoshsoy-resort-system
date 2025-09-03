@@ -375,20 +375,26 @@ async def delete_booking(booking_id: int, db: Session = Depends(get_db)):
     try:
         from sqlalchemy import text
 
+        # Логируем для отладки
+        logger.info(f"Attempting to delete booking with id: {booking_id}")
+
         check = db.execute(text("SELECT id FROM bookings WHERE id = :id"), {"id": booking_id})
-        if not check.fetchone():
+        booking = check.fetchone()
+        if not booking:
+            logger.warning(f"Booking {booking_id} not found")
             raise HTTPException(status_code=404, detail="Booking not found")
 
         db.execute(text("DELETE FROM bookings WHERE id = :id"), {"id": booking_id})
         db.commit()
 
-        return {"message": "Booking deleted successfully"}
+        logger.info(f"Successfully deleted booking {booking_id}")
+        return {"message": "Booking deleted successfully", "id": booking_id}
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error deleting booking: {e}")
+        logger.error(f"Error deleting booking {booking_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -563,3 +569,52 @@ async def fix_room_types(db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# Добавьте этот эндпоинт в main.py после других эндпоинтов bookings_router
+
+@app.get("/api/test-booking-delete/{booking_id}")
+async def test_booking_delete(booking_id: int, db: Session = Depends(get_db)):
+    """Тестовый эндпоинт для проверки удаления бронирования"""
+    try:
+        from sqlalchemy import text
+
+        # Проверяем существует ли бронирование
+        result = db.execute(text("""
+                                 SELECT b.*, r.room_number
+                                 FROM bookings b
+                                          LEFT JOIN rooms r ON b.room_id = r.id
+                                 WHERE b.id = :id
+                                 """), {"id": booking_id})
+
+        booking = result.fetchone()
+
+        if booking:
+            return {
+                "status": "found",
+                "booking": {
+                    "id": booking.id,
+                    "room_id": booking.room_id,
+                    "room_number": booking.room_number,
+                    "start_date": str(booking.start_date),
+                    "end_date": str(booking.end_date),
+                    "guest_name": booking.guest_name
+                },
+                "can_delete": True
+            }
+        else:
+            # Проверим все бронирования для отладки
+            all_bookings = db.execute(text("SELECT id FROM bookings"))
+            ids = [row.id for row in all_bookings]
+
+            return {
+                "status": "not_found",
+                "requested_id": booking_id,
+                "existing_ids": ids,
+                "can_delete": False
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }

@@ -113,20 +113,6 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
           </div>
         ) : (
           <div>
-            {/* Показываем статистику по типам комнат */}
-            <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800 mb-2">
-                Jami {rooms.length} xona topildi
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(groupedRooms).map(([type, typeRooms]) => (
-                  <span key={type} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                    {type}: {typeRooms.length} ta
-                  </span>
-                ))}
-              </div>
-            </div>
-
             {/* Отображаем комнаты сгруппированными или все вместе */}
             {filters.type ? (
               // Если выбран фильтр - показываем простой список
