@@ -25,39 +25,51 @@ export function BookingsList() {
   );
 
   const deleteMutation = useMutation(
-    (bookingId) => bookingService.deleteBooking(bookingId),
+    (bookingId) => {
+      console.log('[BookingsList] Deleting booking with ID:', bookingId);
+      return bookingService.deleteBooking(bookingId);
+    },
     {
-      onSuccess: () => {
+      onSuccess: (data, bookingId) => {
+        console.log('[BookingsList] Successfully deleted booking:', bookingId);
         queryClient.invalidateQueries('bookings');
         queryClient.invalidateQueries('rooms');
         toast.success('Bron muvaffaqiyatli o\'chirildi');
       },
-      onError: (error) => {
-        console.error('Delete error:', error);
+      onError: (error, bookingId) => {
+        console.error('[BookingsList] Delete error for booking', bookingId, ':', error);
+        console.error('Error response:', error.response);
 
-        // Детальная информация об ошибке
-        if (error.response) {
-          console.error('Error status:', error.response.status);
-          console.error('Error data:', error.response.data);
-
-          // Специальная обработка для 405 Method Not Allowed
-          if (error.response.status === 405) {
-            toast.error('Server xatosi: Method Not Allowed. Backend konfiguratsiyasini tekshiring.');
-            return;
-          }
+        if (error.response?.status === 404) {
+          toast.error(`Bron #${bookingId} topilmadi`);
+        } else if (error.response?.status === 405) {
+          toast.error('Server xatosi: Method Not Allowed');
+        } else {
+          toast.error(error.response?.data?.detail || 'Bronni o\'chirishda xatolik');
         }
-
-        toast.error(error.response?.data?.detail || 'Bronni o\'chirishda xatolik');
       }
     }
   );
 
-  const handleDelete = (bookingId) => {
-    console.log('[Delete] Starting deletion for booking:', bookingId);
-    console.log('[Delete] Current URL:', window.location.href);
+  const handleDelete = (booking) => {
+    console.log('[BookingsList] handleDelete called with booking:', booking);
 
-    if (window.confirm('Bronni o\'chirishni tasdiqlaysizmi?')) {
+    // Проверяем что у нас есть правильный ID
+    const bookingId = booking.id;
+
+    if (!bookingId) {
+      console.error('[BookingsList] No booking ID provided');
+      toast.error('Bron ID topilmadi');
+      return;
+    }
+
+    console.log('[BookingsList] Confirming deletion for booking ID:', bookingId);
+
+    if (window.confirm(`Bron #${bookingId} ni o'chirishni tasdiqlaysizmi?`)) {
+      console.log('[BookingsList] User confirmed deletion');
       deleteMutation.mutate(bookingId);
+    } else {
+      console.log('[BookingsList] User cancelled deletion');
     }
   };
 
@@ -104,6 +116,9 @@ export function BookingsList() {
                       <span className="text-sm text-gray-600">
                         {booking.room?.room_type}
                       </span>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        ID: {booking.id}
+                      </span>
                     </div>
 
                     <p className="text-sm text-gray-600 mb-1">
@@ -128,9 +143,9 @@ export function BookingsList() {
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => handleDelete(booking.id)}
+                    onClick={() => handleDelete(booking)}
                     loading={deleteMutation.isLoading}
-                    title="Bronni bekor qilish"
+                    title={`Bron #${booking.id} ni bekor qilish`}
                   >
                     <TrashIcon className="h-4 w-4" />
                   </Button>
