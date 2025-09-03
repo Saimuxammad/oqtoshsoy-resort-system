@@ -343,6 +343,6 @@ export function SettingsPanel() {
           </div>
         </CardContent>
       </Card>
-        </>
+        </div>
       );
 }
