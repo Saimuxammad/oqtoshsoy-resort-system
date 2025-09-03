@@ -15,7 +15,7 @@ export function CalendarView({ selectedRoom }) {
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 }); // Start from Monday
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
-  const { data: bookings = [] } = useQuery(
+  const { data: allBookings = [] } = useQuery(
     ['bookings', selectedRoom?.id, monthStart, monthEnd],
     () => bookingService.getBookings({
       roomId: selectedRoom?.id,
@@ -27,13 +27,33 @@ export function CalendarView({ selectedRoom }) {
     }
   );
 
+  // ВРЕМЕННОЕ РЕШЕНИЕ: Фильтруем бронирования на клиенте
+  const bookings = React.useMemo(() => {
+    if (!selectedRoom) return [];
+
+    // Фильтруем только бронирования для выбранной комнаты
+    const filtered = allBookings.filter(booking => {
+      return booking.room_id === selectedRoom.id;
+    });
+
+    console.log(`[CalendarView] Room #${selectedRoom.room_number} (ID: ${selectedRoom.id}): ${filtered.length} bookings`);
+
+    return filtered;
+  }, [allBookings, selectedRoom]);
+
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const isBooked = (date) => {
+    // Проверяем только бронирования ЭТОЙ комнаты
     return bookings.some(booking => {
       const start = new Date(booking.start_date);
       const end = new Date(booking.end_date);
-      return date >= start && date <= end;
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const startStr = format(start, 'yyyy-MM-dd');
+      const endStr = format(end, 'yyyy-MM-dd');
+
+      // Проверяем, попадает ли дата в диапазон бронирования
+      return dateStr >= startStr && dateStr <= endStr;
     });
   };
 
@@ -120,7 +140,7 @@ export function CalendarView({ selectedRoom }) {
       <div className="mt-6 space-y-2">
         <div className="flex items-center gap-2 text-sm">
           <div className="w-4 h-4 bg-red-100 rounded"></div>
-          <span className="text-gray-600">Band kunlar</span>
+          <span className="text-gray-600">Band kunlar ({bookings.length} ta bron)</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <div className="w-4 h-4 bg-primary-100 rounded"></div>
