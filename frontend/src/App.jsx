@@ -1,81 +1,72 @@
-// Добавьте эту проверку в начало App.jsx после импортов
+import React, { useState, useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import { Toaster } from 'react-hot-toast';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { Header } from './components/Layout/Header';
+import { Navigation } from './components/Layout/Navigation';
+import { RoomList } from './components/RoomList/RoomList';
+import { BookingsList } from './components/BookingsList/BookingsList';
+import { BookingModal } from './components/BookingModal/BookingModal';
+import { CalendarView } from './components/Calendar/CalendarView';
+import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
+import { HistoryLog } from './components/History/HistoryLog';
+import { SettingsPanel } from './components/Settings/SettingsPanel';
+import toast from 'react-hot-toast';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('rooms');
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
 
-  // ... остальные стейты
-
-  useEffect(() => {
-    // Проверяем авторизацию
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
-  }, []);
-
-  const handleLogin = (user) => {
-    setCurrentUser(user);
+  const handleEditRoom = (room) => {
+    setSelectedRoom(room);
+    setSelectedBooking(room.current_booking);
+    setIsBookingModalOpen(true);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    toast.success('Tizimdan chiqdingiz');
+  const handleViewCalendar = (room) => {
+    setSelectedRoom(room);
+    setActiveTab('calendar');
   };
 
-  // Если не авторизован - показываем форму входа
-  if (!currentUser) {
-    return <LoginForm onLogin={handleLogin} />;
-  }
-
-  // Проверка прав доступа
-  const hasPermission = (permission) => {
-    return currentUser.permissions.includes(permission);
-  };
-
-  // Фильтруем вкладки на основе прав
-  const getVisibleTabs = () => {
-    const tabs = ['rooms', 'bookings'];
-
-    if (hasPermission('analytics')) tabs.push('analytics');
-    tabs.push('history'); // История доступна всем
-    if (hasPermission('settings')) tabs.push('settings');
-
-    return tabs;
+  const handleCloseModal = () => {
+    setIsBookingModalOpen(false);
+    setSelectedRoom(null);
+    setSelectedBooking(null);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header currentUser={currentUser} onLogout={handleLogout} />
-      <Navigation
-        activeTab={activeTab}
-        onChange={setActiveTab}
-        visibleTabs={getVisibleTabs()}
-        hasPermission={hasPermission}
-      />
+      <Header />
+      <Navigation activeTab={activeTab} onChange={setActiveTab} />
 
       <main className="container mx-auto px-4 py-6">
-        {/* Контент в зависимости от прав */}
         {activeTab === 'rooms' && (
           <RoomList
-            onEditRoom={hasPermission('update') ? handleEditRoom : null}
+            onEditRoom={handleEditRoom}
             onViewCalendar={handleViewCalendar}
-            canCreate={hasPermission('create')}
           />
         )}
 
         {activeTab === 'bookings' && (
-          <BookingsList
-            canDelete={hasPermission('delete')}
-            canEdit={hasPermission('update')}
-          />
+          <BookingsList />
         )}
 
-        {activeTab === 'analytics' && hasPermission('analytics') && (
+        {activeTab === 'calendar' && (
+          <CalendarView selectedRoom={selectedRoom} />
+        )}
+
+        {activeTab === 'analytics' && (
           <AnalyticsDashboard />
         )}
 
@@ -83,21 +74,39 @@ function AppContent() {
           <HistoryLog />
         )}
 
-        {activeTab === 'settings' && hasPermission('settings') && (
+        {activeTab === 'settings' && (
           <SettingsPanel />
         )}
       </main>
 
-      {/* Модальное окно доступно только если есть права на создание/редактирование */}
-      {hasPermission('create') && (
-        <BookingModal
-          isOpen={isBookingModalOpen}
-          onClose={handleCloseModal}
-          room={selectedRoom}
-          booking={selectedBooking}
-        />
-      )}
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={handleCloseModal}
+        room={selectedRoom}
+        booking={selectedBooking}
+      />
     </div>
   );
 }
+
+function App() {
+  return (
+    <LanguageProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppContent />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+          }}
+        />
+      </QueryClientProvider>
+    </LanguageProvider>
+  );
+}
+
 export default App;
