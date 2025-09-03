@@ -1,4 +1,3 @@
-import { UserManagement } from './UserManagement';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '../UI/Card';
 import { Button } from '../UI/Button';
@@ -145,10 +144,7 @@ export function SettingsPanel() {
           </Button>
         </CardContent>
       </Card>
-{/* Управление пользователями - только для админов */}
-{userInfo.role === 'admin' || userInfo.role === 'super_admin' && (
-  <UserManagement />
-)}
+
       {/* Notifications */}
       <Card>
         <CardContent className="p-6">
