@@ -1,16 +1,30 @@
 import api from './api';
 
 export const bookingService = {
-  // Get all bookings
+  // Get all bookings - ИСПРАВЛЕНО: правильная передача параметров
   getBookings: async (filters = {}) => {
     try {
       const params = new URLSearchParams();
-      if (filters.roomId) params.append('room_id', filters.roomId);
+
+      // ВАЖНО: Передаем room_id для фильтрации
+      if (filters.roomId) {
+        params.append('room_id', filters.roomId);
+        console.log('[BookingService] Filtering by room_id:', filters.roomId);
+      }
       if (filters.startDate) params.append('start_date', filters.startDate);
       if (filters.endDate) params.append('end_date', filters.endDate);
 
-      const response = await api.get(`/bookings${params.toString() ? '?' + params.toString() : ''}`);
-      console.log('[BookingService] Bookings loaded:', response.data);
+      const url = params.toString() ? `bookings?${params.toString()}` : 'bookings';
+      console.log('[BookingService] Request URL:', `/api/${url}`);
+
+      const response = await api.get(url);
+      console.log('[BookingService] Bookings loaded:', response.data.length, 'items');
+
+      // Логируем для отладки
+      if (filters.roomId) {
+        console.log('[BookingService] Bookings for room', filters.roomId, ':', response.data);
+      }
+
       return response.data;
     } catch (error) {
       console.error('[BookingService] getBookings error:', error);
@@ -21,7 +35,7 @@ export const bookingService = {
   // Get single booking
   getBooking: async (bookingId) => {
     try {
-      const response = await api.get(`/bookings/${bookingId}`);
+      const response = await api.get(`bookings/${bookingId}`);
       return response.data;
     } catch (error) {
       console.error('[BookingService] getBooking error:', error);
@@ -43,20 +57,22 @@ export const bookingService = {
         notes: booking.notes || ''
       };
 
-      // Используем новый эндпоинт /bookings/v2
-      const response = await api.post('/bookings/v2', bookingData);
-      console.log('[BookingService] Booking created:', response.data);
-      return response.data;
+      // Сначала пробуем v2 эндпоинт
+      try {
+        const response = await api.post('bookings/v2', bookingData);
+        console.log('[BookingService] Booking created via v2:', response.data);
+        return response.data;
+      } catch (error) {
+        // Если v2 не работает, используем обычный
+        if (error.response?.status === 404) {
+          console.log('[BookingService] v2 not found, using regular endpoint');
+          const response = await api.post('bookings', bookingData);
+          return response.data;
+        }
+        throw error;
+      }
     } catch (error) {
       console.error('[BookingService] createBooking error:', error);
-
-      // Если v2 не работает, пробуем обычный эндпоинт
-      if (error.response?.status === 404) {
-        console.log('[BookingService] v2 endpoint not found, trying regular endpoint');
-        const response = await api.post('/bookings', booking);
-        return response.data;
-      }
-
       throw error;
     }
   },
@@ -68,14 +84,14 @@ export const bookingService = {
 
       // Сначала пробуем PATCH
       try {
-        const response = await api.patch(`/bookings/${bookingId}`, data);
+        const response = await api.patch(`bookings/${bookingId}`, data);
         console.log('[BookingService] Booking updated with PATCH:', response.data);
         return response.data;
       } catch (patchError) {
         // Если PATCH не поддерживается, пробуем PUT
         if (patchError.response?.status === 405) {
           console.log('[BookingService] PATCH not allowed, trying PUT...');
-          const response = await api.put(`/bookings/${bookingId}`, data);
+          const response = await api.put(`bookings/${bookingId}`, data);
           console.log('[BookingService] Booking updated with PUT:', response.data);
           return response.data;
         }
@@ -87,38 +103,28 @@ export const bookingService = {
     }
   },
 
-  // Delete booking - ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ
+  // Delete booking
   deleteBooking: async (bookingId) => {
     try {
       console.log('[BookingService] Deleting booking ID:', bookingId);
-
-      // Формируем правильный URL
       const url = `bookings/${bookingId}`;
-      console.log('[BookingService] DELETE URL:', url);
-
-      // Отправляем запрос
       const response = await api.delete(url);
-
       console.log('[BookingService] Delete response:', response.data);
       return response.data;
     } catch (error) {
       console.error('[BookingService] Delete error:', error);
-      console.error('[BookingService] Error response:', error.response);
 
       if (error.response?.status === 404) {
-        // Более информативное сообщение об ошибке
         const message = `Bron #${bookingId} topilmadi yoki allaqachon o'chirilgan`;
         console.error('[BookingService]', message);
         throw new Error(message);
-      } else if (error.response?.status === 405) {
-        throw new Error('Server does not support DELETE method');
       }
 
       throw error;
     }
   },
 
-  // Check availability - упрощенная версия
+  // Check availability
   checkAvailability: async (roomId, startDate, endDate, excludeBookingId = null) => {
     try {
       console.log('[BookingService] Checking availability:', {
@@ -131,7 +137,6 @@ export const bookingService = {
 
     } catch (error) {
       console.error('[BookingService] checkAvailability error:', error);
-      // При ошибке разрешаем создание
       return { available: true };
     }
   }

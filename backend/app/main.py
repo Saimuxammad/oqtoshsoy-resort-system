@@ -458,6 +458,98 @@ async def delete_booking(booking_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@bookings_router.get("")
+@bookings_router.get("/")
+async def get_bookings(
+        room_id: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        db: Session = Depends(get_db)
+):
+    """Получить все бронирования с возможностью фильтрации"""
+    try:
+        from sqlalchemy import text
+
+        # Базовый запрос
+        query = """
+                SELECT b.id,
+                       b.room_id,
+                       b.start_date,
+                       b.end_date,
+                       b.guest_name,
+                       b.notes,
+                       b.created_by,
+                       b.created_at,
+                       b.updated_at,
+                       r.room_number,
+                       r.room_type
+                FROM bookings b
+                         LEFT JOIN rooms r ON b.room_id = r.id \
+                """
+
+        # Добавляем условия фильтрации
+        conditions = []
+        params = {}
+
+        # КРИТИЧЕСКИ ВАЖНО: Фильтрация по room_id
+        if room_id:
+            conditions.append("b.room_id = :room_id")
+            params['room_id'] = room_id
+
+        # Фильтрация по датам
+        if start_date:
+            conditions.append("b.end_date >= :start_date")
+            params['start_date'] = start_date
+
+        if end_date:
+            conditions.append("b.start_date <= :end_date")
+            params['end_date'] = end_date
+
+        # Добавляем WHERE если есть условия
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY b.start_date DESC"
+
+        # Выполняем запрос
+        result = db.execute(text(query), params)
+
+        type_map = {
+            'STANDARD_2': "2 o'rinli standart",
+            'STANDARD_4': "4 o'rinli standart",
+            'LUX_2': "2 o'rinli lyuks",
+            'VIP_SMALL_4': "4 o'rinli kichik VIP",
+            'VIP_BIG_4': "4 o'rinli katta VIP",
+            'APARTMENT_4': "4 o'rinli apartament",
+            'COTTAGE_6': "Kottedj (6 kishi uchun)",
+            'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
+        }
+
+        bookings = []
+        for row in result:
+            bookings.append({
+                "id": row.id,
+                "room_id": row.room_id,
+                "start_date": str(row.start_date) if row.start_date else None,
+                "end_date": str(row.end_date) if row.end_date else None,
+                "guest_name": row.guest_name or "",
+                "notes": row.notes or "",
+                "created_by": row.created_by or 1,
+                "created_at": row.created_at.isoformat() if row.created_at else "2024-01-01T00:00:00",
+                "updated_at": row.updated_at.isoformat() if row.updated_at else "2024-01-01T00:00:00",
+                "room": {
+                    "id": row.room_id,
+                    "room_number": row.room_number,
+                    "room_type": type_map.get(row.room_type, row.room_type)
+                } if row.room_number else None
+            })
+
+        logger.info(f"Returning {len(bookings)} bookings" + (f" for room_id={room_id}" if room_id else ""))
+        return bookings
+
+    except Exception as e:
+        logger.error(f"Error in get_bookings: {e}")
+        return []
 @bookings_router.put("/{booking_id}")
 @bookings_router.patch("/{booking_id}")
 async def update_booking(booking_id: int, booking_data: BookingUpdate, db: Session = Depends(get_db)):
