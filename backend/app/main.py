@@ -10,8 +10,6 @@ import logging
 import os
 
 from .database import engine, get_db
-
-from .database import engine, get_db
 from .models import room, booking, user, history
 from .services.room_service import RoomService
 from .services.notification_service import notification_service
@@ -79,7 +77,8 @@ origins = [
     "https://oqtoshsoy-resort-system-production.up.railway.app",
     "http://localhost:5173",
     "http://localhost:5174",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "*"  # Временно разрешаем все источники для отладки
 ]
 
 # Добавляем frontend URL из переменной окружения
@@ -156,7 +155,6 @@ async def test_endpoint():
 async def test_database(db: Session = Depends(get_db)):
     """Test database connection"""
     try:
-        # Попробуем подсчитать количество комнат
         from .models.room import Room
         count = db.query(Room).count()
         return {"status": "ok", "rooms_count": count}
@@ -164,29 +162,9 @@ async def test_database(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/api/test-room")
-async def test_room(db: Session = Depends(get_db)):
-    """Test getting one room"""
-    try:
-        from .models.room import Room
-        room = db.query(Room).first()
-        if room:
-            return {
-                "id": room.id,
-                "room_number": room.room_number,
-                "room_type": str(room.room_type),
-                "room_type_value": room.room_type.value if hasattr(room.room_type, 'value') else None,
-                "capacity": room.capacity,
-                "price": float(room.price_per_night) if room.price_per_night else 0
-            }
-        return {"status": "no_rooms"}
-    except Exception as e:
-        return {"status": "error", "message": str(e), "type": str(type(e))}
-
-
 @app.get("/api/init-rooms")
 async def init_rooms(db: Session = Depends(get_db)):
-    """Initialize rooms in database"""
+    """Initialize rooms in database if empty"""
     try:
         from .models.room import Room
         # Проверяем, есть ли уже комнаты
@@ -235,123 +213,54 @@ async def fix_database(db: Session = Depends(get_db)):
                 added_columns.append(column_name)
 
         # Устанавливаем цены по умолчанию для разных типов комнат
+        from .models.room import RoomType
+
         price_map = {
-            "STANDARD_DOUBLE": 500000,
-            "STANDARD_QUAD": 700000,
-            "LUX_DOUBLE": 800000,
-            "VIP_SMALL": 1000000,
-            "VIP_LARGE": 1200000,
-            "APARTMENT": 1500000,
-            "COTTAGE": 2000000,
-            "PRESIDENT": 3000000
+            RoomType.STANDARD_DOUBLE: 500000,
+            RoomType.STANDARD_QUAD: 700000,
+            RoomType.LUX_DOUBLE: 800000,
+            RoomType.VIP_SMALL: 1000000,
+            RoomType.VIP_LARGE: 1200000,
+            RoomType.APARTMENT: 1500000,
+            RoomType.COTTAGE: 2000000,
+            RoomType.PRESIDENT: 3000000
         }
 
         for room_type, price in price_map.items():
             db.execute(
                 text(
-                    f"UPDATE rooms SET price_per_night = :price WHERE room_type = '{room_type}' AND price_per_night IS NULL"),
-                {"price": price}
+                    f"UPDATE rooms SET price_per_night = :price WHERE room_type = :room_type AND price_per_night IS NULL"),
+                {"price": price, "room_type": room_type.name}
             )
+
+        # Устанавливаем capacity по умолчанию
+        capacity_map = {
+            RoomType.STANDARD_DOUBLE: 2,
+            RoomType.STANDARD_QUAD: 4,
+            RoomType.LUX_DOUBLE: 2,
+            RoomType.VIP_SMALL: 4,
+            RoomType.VIP_LARGE: 4,
+            RoomType.APARTMENT: 4,
+            RoomType.COTTAGE: 6,
+            RoomType.PRESIDENT: 8
+        }
+
+        for room_type, capacity in capacity_map.items():
+            db.execute(
+                text(f"UPDATE rooms SET capacity = :capacity WHERE room_type = :room_type AND capacity IS NULL"),
+                {"capacity": capacity, "room_type": room_type.name}
+            )
+
         db.commit()
 
         return {
             "status": "success",
             "added_columns": added_columns,
-            "message": f"Added {len(added_columns)} columns"
+            "message": f"Added {len(added_columns)} columns and updated default values"
         }
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
-
-
-@app.get("/api/rooms-raw")
-async def get_rooms_raw(db: Session = Depends(get_db)):
-    """Get raw room data directly from database"""
-    try:
-        from sqlalchemy import text
-
-        # Прямой SQL запрос для получения данных
-        result = db.execute(text("""
-                                 SELECT id, room_number, room_type::text as room_type
-                                 FROM rooms
-                                 ORDER BY id
-                                 """))
-
-        rooms = []
-        for row in result:
-            rooms.append({
-                "id": row.id,
-                "room_number": row.room_number,
-                "room_type": row.room_type,
-                "capacity": 2,  # значение по умолчанию
-                "price_per_night": 500000,  # значение по умолчанию
-                "description": "",
-                "amenities": "",
-                "is_available": True
-            })
-
-        return rooms
-    except Exception as e:
-        return {"error": str(e)}
-
-
-@app.get("/api/rooms")
-async def get_rooms_override(db: Session = Depends(get_db)):
-    """Override the default rooms endpoint with raw data"""
-    try:
-        from sqlalchemy import text
-
-        # Прямой SQL запрос для получения данных
-        result = db.execute(text("""
-                                 SELECT id, room_number, room_type::text as room_type
-                                 FROM rooms
-                                 ORDER BY id
-                                 """))
-
-        rooms = []
-        for row in result:
-            # Определяем capacity и цену на основе типа
-            room_type = row.room_type
-
-            capacity_map = {
-                'STANDARD_2': 2,
-                'STANDARD_4': 4,
-                'LUX_2': 2,
-                'VIP_SMALL_4': 4,
-                'VIP_BIG_4': 4,
-                'APARTMENT_4': 4,
-                'COTTAGE_6': 6,
-                'PRESIDENT_8': 8
-            }
-
-            price_map = {
-                'STANDARD_2': 500000,
-                'STANDARD_4': 700000,
-                'LUX_2': 800000,
-                'VIP_SMALL_4': 1000000,
-                'VIP_BIG_4': 1200000,
-                'APARTMENT_4': 1500000,
-                'COTTAGE_6': 2000000,
-                'PRESIDENT_8': 3000000
-            }
-
-            rooms.append({
-                "id": row.id,
-                "room_number": row.room_number,
-                "room_type": row.room_type,
-                "capacity": capacity_map.get(room_type, 2),
-                "price_per_night": price_map.get(room_type, 500000),
-                "description": "",
-                "amenities": "",
-                "is_available": True,
-                "created_at": "2024-01-01T00:00:00",
-                "updated_at": "2024-01-01T00:00:00"
-            })
-
-        return rooms
-    except Exception as e:
-        print(f"Error in get_rooms_override: {str(e)}")
-        return []
 
 
 @app.get("/health")

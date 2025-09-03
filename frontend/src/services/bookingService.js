@@ -9,11 +9,11 @@ export const bookingService = {
       if (filters.startDate) params.append('start_date', filters.startDate);
       if (filters.endDate) params.append('end_date', filters.endDate);
 
-      const response = await api.get(`/api/bookings?${params}`);
-      console.log('Bookings loaded:', response.data);
+      const response = await api.get(`/bookings?${params}`);
+      console.log('[BookingService] Bookings loaded:', response.data);
       return response.data;
     } catch (error) {
-      console.error('getBookings error:', error);
+      console.error('[BookingService] getBookings error:', error);
       throw error;
     }
   },
@@ -21,10 +21,10 @@ export const bookingService = {
   // Get single booking
   getBooking: async (bookingId) => {
     try {
-      const response = await api.get(`/api/bookings/${bookingId}`);
+      const response = await api.get(`/bookings/${bookingId}`);
       return response.data;
     } catch (error) {
-      console.error('getBooking error:', error);
+      console.error('[BookingService] getBooking error:', error);
       throw error;
     }
   },
@@ -32,184 +32,75 @@ export const bookingService = {
   // Create booking
   createBooking: async (booking) => {
     try {
-      console.log('Creating booking:', booking);
-      const response = await api.post('/api/bookings', booking);
-      console.log('Booking created:', response.data);
+      console.log('[BookingService] Creating booking:', booking);
+
+      // Убеждаемся что даты в правильном формате
+      const bookingData = {
+        ...booking,
+        start_date: booking.start_date,
+        end_date: booking.end_date,
+        room_id: parseInt(booking.room_id),
+        guest_name: booking.guest_name || '',
+        notes: booking.notes || ''
+      };
+
+      const response = await api.post('/bookings', bookingData);
+      console.log('[BookingService] Booking created:', response.data);
       return response.data;
     } catch (error) {
-      console.error('createBooking error:', error);
+      console.error('[BookingService] createBooking error:', error);
+      console.error('[BookingService] Error response:', error.response);
       throw error;
     }
   },
 
-  // Update booking - используем PUT вместо PATCH
+  // Update booking - используем PATCH, с fallback на PUT
   updateBooking: async (bookingId, data) => {
     try {
       console.log('[BookingService] Updating booking:', bookingId, data);
 
-      // Получаем токен
-      const token = localStorage.getItem('auth_token') ||
-                    sessionStorage.getItem('auth_token') ||
-                    'dev_token';
-
-      // Базовый URL
-      const baseUrl = 'https://oqtoshsoy-resort-system-production.up.railway.app';
-      const url = `${baseUrl}/api/bookings/${bookingId}`;
-
-      console.log('[BookingService] UPDATE URL:', url);
-      console.log('[BookingService] Update data:', data);
-
-      // Пробуем сначала PATCH
-      let response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-
-      // Если PATCH не поддерживается, пробуем PUT
-      if (response.status === 405) {
-        console.log('[BookingService] PATCH not allowed, trying PUT...');
-        response = await fetch(url, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
-      }
-
-      console.log('[BookingService] Update response:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[BookingService] Update error:', errorText);
-
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { detail: errorText || `HTTP ${response.status}` };
+      // Сначала пробуем PATCH
+      try {
+        const response = await api.patch(`/bookings/${bookingId}`, data);
+        console.log('[BookingService] Booking updated with PATCH:', response.data);
+        return response.data;
+      } catch (patchError) {
+        // Если PATCH не поддерживается (405), пробуем PUT
+        if (patchError.response?.status === 405) {
+          console.log('[BookingService] PATCH not allowed, trying PUT...');
+          const response = await api.put(`/bookings/${bookingId}`, data);
+          console.log('[BookingService] Booking updated with PUT:', response.data);
+          return response.data;
         }
-
-        const error = new Error(errorData.detail || 'Update failed');
-        error.response = {
-          status: response.status,
-          data: errorData
-        };
-        throw error;
+        throw patchError;
       }
-
-      const result = await response.json();
-      console.log('[BookingService] Booking updated:', result);
-      return result;
-
     } catch (error) {
       console.error('[BookingService] updateBooking error:', error);
       throw error;
     }
   },
 
-  // Delete booking - улучшенная версия с детальным логированием
+  // Delete booking - упрощенная версия
   deleteBooking: async (bookingId) => {
     try {
-      console.log('[BookingService] Starting delete for booking:', bookingId);
+      console.log('[BookingService] Deleting booking:', bookingId);
 
-      // Получаем токен
-      const token = localStorage.getItem('auth_token') ||
-                    sessionStorage.getItem('auth_token') ||
-                    'dev_token';
+      const response = await api.delete(`/bookings/${bookingId}`);
 
-      // Базовый URL без trailing slash
-      const baseUrl = 'https://oqtoshsoy-resort-system-production.up.railway.app/api';
-      const url = `${baseUrl}/bookings/${bookingId}`;
-
-      console.log('[BookingService] DELETE URL:', url);
-      console.log('[BookingService] Token:', token ? `${token.substring(0, 20)}...` : 'none');
-      console.log('[BookingService] Current location:', window.location.href);
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Origin': window.location.origin
-        },
-        mode: 'cors',
-        credentials: 'include'
-      });
-
-      console.log('[BookingService] Response received:');
-      console.log('  Status:', response.status);
-      console.log('  Status Text:', response.statusText);
-      console.log('  OK:', response.ok);
-      console.log('  Headers:', Object.fromEntries(response.headers.entries()));
-
-      // Читаем тело ответа
-      const responseText = await response.text();
-      console.log('[BookingService] Response body:', responseText);
-
-      if (!response.ok) {
-        // Пробуем парсить как JSON
-        let errorData;
-        try {
-          errorData = JSON.parse(responseText);
-          console.error('[BookingService] Error data:', errorData);
-        } catch (e) {
-          errorData = { detail: responseText || `HTTP ${response.status}: ${response.statusText}` };
-        }
-
-        // Создаем ошибку в формате, который ожидают компоненты
-        const error = new Error(errorData.detail || 'Delete failed');
-        error.response = {
-          status: response.status,
-          statusText: response.statusText,
-          data: errorData
-        };
-        throw error;
-      }
-
-      // Парсим успешный ответ
-      let data;
-      if (responseText) {
-        try {
-          data = JSON.parse(responseText);
-        } catch (e) {
-          // Если не JSON, возвращаем как есть
-          data = { message: responseText || 'Deleted successfully' };
-        }
-      } else {
-        data = { message: 'Deleted successfully' };
-      }
-
-      console.log('[BookingService] Delete successful:', data);
-      return data;
-
+      console.log('[BookingService] Delete response:', response.data);
+      return response.data;
     } catch (error) {
       console.error('[BookingService] Delete error:', error);
-      console.error('[BookingService] Error stack:', error.stack);
+      console.error('[BookingService] Error response:', error.response);
 
-      // Если error.response уже есть, просто пробрасываем
-      if (error.response) {
-        throw error;
+      // Специальная обработка для 405 Method Not Allowed
+      if (error.response?.status === 405) {
+        const errorMsg = 'Server does not support DELETE method. Please check backend configuration.';
+        console.error('[BookingService]', errorMsg);
+        throw new Error(errorMsg);
       }
 
-      // Иначе создаем структуру ошибки
-      const wrappedError = new Error(error.message);
-      wrappedError.response = {
-        status: 0,
-        statusText: 'Network Error',
-        data: {
-          detail: error.message || 'Network error occurred'
-        }
-      };
-      throw wrappedError;
+      throw error;
     }
   },
 
@@ -229,7 +120,7 @@ export const bookingService = {
       const response = await api.get(`/bookings/check-availability?${params}`);
       return response.data;
     } catch (error) {
-      console.error('checkAvailability error:', error);
+      console.error('[BookingService] checkAvailability error:', error);
       throw error;
     }
   }

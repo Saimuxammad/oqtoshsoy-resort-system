@@ -5,6 +5,7 @@ import { Loading } from '../UI/Loading';
 import { Button } from '../UI/Button';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { roomService } from '../../services/roomService';
 
 export function RoomList({ onEditRoom, onViewCalendar }) {
   const [filters, setFilters] = useState({});
@@ -17,36 +18,26 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
       setIsLoading(true);
       setError(null);
 
-      // Прямой fetch без использования сервисов
-      const response = await fetch('https://oqtoshsoy-resort-system-production.up.railway.app/api/rooms');
-      const data = await response.json();
+      console.log('[RoomList] Loading rooms with filters:', filters);
 
-      console.log('Direct fetch - rooms count:', data.length);
-      console.log('First 3 rooms:', data.slice(0, 3));
+      // Используем roomService для получения комнат
+      const data = await roomService.getRooms(filters);
 
-      // Преобразуем типы комнат
-      const roomTypeMap = {
-        'STANDARD_2': "2 o'rinli standart",
-        'STANDARD_4': "4 o'rinli standart",
-        'LUX_2': "2 o'rinli lyuks",
-        'VIP_SMALL_4': "4 o'rinli kichik VIP",
-        'VIP_BIG_4': "4 o'rinli katta VIP",
-        'APARTMENT_4': "4 o'rinli apartament",
-        'COTTAGE_6': "Kottedj (6 kishi uchun)",
-        'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
-      };
+      console.log('[RoomList] Received rooms:', data.length);
 
-      const transformedRooms = data.map(room => ({
-        ...room,
-        room_type: roomTypeMap[room.room_type] || room.room_type
-      }));
-
-      setRooms(transformedRooms);
-      toast.success(`${transformedRooms.length} xona yuklandi`);
+      if (Array.isArray(data)) {
+        setRooms(data);
+        toast.success(`${data.length} xona yuklandi`);
+      } else {
+        console.error('[RoomList] Data is not an array:', data);
+        setRooms([]);
+        toast.error('Xonalar formatida xatolik');
+      }
     } catch (err) {
-      console.error('Load rooms error:', err);
-      setError(err.message);
+      console.error('[RoomList] Load rooms error:', err);
+      setError(err.message || 'Xonalarni yuklashda xatolik');
       toast.error('Xonalarni yuklashda xatolik');
+      setRooms([]);
     } finally {
       setIsLoading(false);
     }
@@ -54,10 +45,15 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
 
   useEffect(() => {
     loadRooms();
-  }, []);
+  }, [filters]); // Перезагружаем при изменении фильтров
 
   const handleRefresh = () => {
     loadRooms();
+  };
+
+  const handleFilterChange = (newFilters) => {
+    console.log('[RoomList] Filter changed:', newFilters);
+    setFilters(newFilters);
   };
 
   if (isLoading) return <Loading />;
@@ -75,10 +71,20 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
     );
   }
 
+  // Группируем комнаты по типу для удобного отображения
+  const groupedRooms = rooms.reduce((groups, room) => {
+    const type = room.room_type;
+    if (!groups[type]) {
+      groups[type] = [];
+    }
+    groups[type].push(room);
+    return groups;
+  }, {});
+
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       <div className="lg:w-64 flex-shrink-0">
-        <RoomFilter filters={filters} onChange={setFilters} />
+        <RoomFilter filters={filters} onChange={handleFilterChange} />
       </div>
 
       <div className="flex-1">
@@ -97,27 +103,65 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
         </div>
 
         {rooms.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>Xonalar topilmadi</p>
+          <div className="text-center py-12">
+            <div className="text-gray-500">
+              <p className="text-lg mb-2">Xonalar topilmadi</p>
+              {filters.type && (
+                <p className="text-sm">Filterni o'chirib ko'ring</p>
+              )}
+            </div>
           </div>
         ) : (
           <div>
+            {/* Показываем статистику по типам комнат */}
             <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
+              <p className="text-sm text-blue-800 mb-2">
                 Jami {rooms.length} xona topildi
               </p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(groupedRooms).map(([type, typeRooms]) => (
+                  <span key={type} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                    {type}: {typeRooms.length} ta
+                  </span>
+                ))}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {rooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  onEdit={onEditRoom}
-                  onViewCalendar={onViewCalendar}
-                />
-              ))}
-            </div>
+            {/* Отображаем комнаты сгруппированными или все вместе */}
+            {filters.type ? (
+              // Если выбран фильтр - показываем простой список
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {rooms.map((room) => (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    onEdit={onEditRoom}
+                    onViewCalendar={onViewCalendar}
+                  />
+                ))}
+              </div>
+            ) : (
+              // Если фильтр не выбран - группируем по типам
+              <div className="space-y-6">
+                {Object.entries(groupedRooms).map(([type, typeRooms]) => (
+                  <div key={type}>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      {type} ({typeRooms.length} ta)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {typeRooms.map((room) => (
+                        <RoomCard
+                          key={room.id}
+                          room={room}
+                          onEdit={onEditRoom}
+                          onViewCalendar={onViewCalendar}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

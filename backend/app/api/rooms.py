@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from datetime import date
-import json
 
 from ..database import get_db
 from ..models.room import Room as RoomModel, RoomType
+from ..models.booking import Booking as BookingModel
 from ..services.room_service import RoomService
 from ..utils.dependencies import get_current_user, require_admin
 
@@ -24,57 +24,62 @@ async def get_rooms(
     try:
         query = db.query(RoomModel)
 
+        # Фильтрация по типу комнаты
         if room_type:
-            query = query.filter(RoomModel.room_type == room_type)
+            # Преобразуем строку в enum если нужно
+            for rt in RoomType:
+                if rt.value == room_type:
+                    query = query.filter(RoomModel.room_type == rt)
+                    break
 
         rooms = query.offset(skip).limit(limit).all()
 
-        # Простое преобразование в список словарей
+        # Преобразуем в список словарей с полной информацией
         result = []
         for room in rooms:
-            # Обработка room_type - конвертируем enum в строку
-            room_type_value = room.room_type
-            if hasattr(room_type_value, 'value'):
-                room_type_str = room_type_value.value
-            else:
-                room_type_str = str(room_type_value)
+            # Получаем текущее бронирование если есть
+            current_booking = db.query(BookingModel).filter(
+                BookingModel.room_id == room.id,
+                BookingModel.start_date <= date.today(),
+                BookingModel.end_date >= date.today()
+            ).first()
 
             room_data = {
                 "id": room.id,
                 "room_number": room.room_number,
-                "room_type": room_type_str,
-                "capacity": getattr(room, 'capacity', 2),  # Безопасное получение capacity
-                "price_per_night": float(room.price_per_night) if room.price_per_night else 0,
+                "room_type": room.room_type.value if hasattr(room.room_type, 'value') else str(room.room_type),
+                "capacity": room.capacity if room.capacity else 2,
+                "price_per_night": float(room.price_per_night) if room.price_per_night else 500000,
                 "description": room.description if room.description else "",
                 "amenities": room.amenities if room.amenities else "",
                 "created_at": room.created_at.isoformat() if room.created_at else "2024-01-01T00:00:00",
                 "updated_at": room.updated_at.isoformat() if room.updated_at else "2024-01-01T00:00:00",
-                "is_available": True,
-                "current_booking": None
+                "is_available": current_booking is None,
+                "current_booking": {
+                    "id": current_booking.id,
+                    "start_date": str(current_booking.start_date),
+                    "end_date": str(current_booking.end_date),
+                    "guest_name": current_booking.guest_name
+                } if current_booking else None
             }
+
+            # Фильтрация по статусу
+            if status:
+                if status == "available" and not room_data["is_available"]:
+                    continue
+                elif status == "occupied" and room_data["is_available"]:
+                    continue
+
             result.append(room_data)
 
         return result
+
     except Exception as e:
         print(f"Error in get_rooms: {str(e)}")
-        print(f"Error type: {type(e)}")
         import traceback
         traceback.print_exc()
-
-        # Возвращаем тестовые данные при ошибке
-        return [{
-            "id": 1,
-            "room_number": "101",
-            "room_type": "2 o'rinli standart",
-            "capacity": 2,
-            "price_per_night": 500000,
-            "description": "Test room",
-            "amenities": "Wi-Fi, TV",
-            "created_at": "2024-01-01T00:00:00",
-            "updated_at": "2024-01-01T00:00:00",
-            "is_available": True,
-            "current_booking": None
-        }]
+        # Не возвращаем пустой массив, а пробрасываем ошибку
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{room_id}")
@@ -88,17 +93,30 @@ async def get_room(
         if not room:
             raise HTTPException(status_code=404, detail="Room not found")
 
+        # Получаем текущее бронирование
+        current_booking = db.query(BookingModel).filter(
+            BookingModel.room_id == room.id,
+            BookingModel.start_date <= date.today(),
+            BookingModel.end_date >= date.today()
+        ).first()
+
         return {
             "id": room.id,
             "room_number": room.room_number,
             "room_type": room.room_type.value if hasattr(room.room_type, 'value') else str(room.room_type),
-            "capacity": room.capacity,
-            "price_per_night": float(room.price_per_night),
+            "capacity": room.capacity if room.capacity else 2,
+            "price_per_night": float(room.price_per_night) if room.price_per_night else 500000,
             "description": room.description or "",
             "amenities": room.amenities or "",
             "created_at": room.created_at.isoformat() if room.created_at else None,
             "updated_at": room.updated_at.isoformat() if room.updated_at else None,
-            "is_available": True
+            "is_available": current_booking is None,
+            "current_booking": {
+                "id": current_booking.id,
+                "start_date": str(current_booking.start_date),
+                "end_date": str(current_booking.end_date),
+                "guest_name": current_booking.guest_name
+            } if current_booking else None
         }
     except HTTPException:
         raise
@@ -118,7 +136,7 @@ async def update_room(
     room = RoomService.update_room(db, room_id, room_update)
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    return {"message": "Room updated successfully"}
+    return {"message": "Room updated successfully", "room_id": room_id}
 
 
 @router.get("/{room_id}/availability")
@@ -137,6 +155,7 @@ async def check_room_availability(
 
     return {
         "room_id": room_id,
+        "room_number": room.room_number,
         "start_date": start_date,
         "end_date": end_date,
         "is_available": is_available
