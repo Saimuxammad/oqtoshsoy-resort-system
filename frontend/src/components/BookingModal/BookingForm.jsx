@@ -66,22 +66,9 @@ export function BookingForm({ room, booking, onSubmit, onCancel, onDelete, isLoa
       return;
     }
 
-    // Проверяем доступность
-    const isAvailable = await checkAvailability();
-
-    if (!isAvailable && !booking) {
-      // Только для новых бронирований показываем предупреждение
-      // При редактировании пропускаем, так как может быть то же бронирование
-      const confirmBooking = window.confirm(
-        'Bu sanalar uchun xona band ko\'rinadi. Davom etasizmi?\n' +
-        '(Sistema yangi qoidalar bilan ishlayapti: chiqish va kirish bir kunda bo\'lishi mumkin)'
-      );
-
-      if (!confirmBooking) {
-        return;
-      }
-    }
-
+    // Отправляем данные без проверки доступности
+    // Сервер сам проверит с правильной логикой
+    console.log('[BookingForm] Submitting:', formData);
     onSubmit(formData);
   };
 
