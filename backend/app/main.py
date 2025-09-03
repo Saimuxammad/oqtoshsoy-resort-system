@@ -178,6 +178,63 @@ async def get_rooms(
         return []
 
 
+# Добавьте этот эндпоинт в main.py после других эндпоинтов rooms_router
+
+@rooms_router.get("/{room_id}/bookings")
+async def get_room_bookings(
+        room_id: int,
+        db: Session = Depends(get_db)
+):
+    """Получить все бронирования для конкретной комнаты"""
+    try:
+        from sqlalchemy import text
+
+        # Проверяем существует ли комната
+        room_check = db.execute(text("""
+                                     SELECT id, room_number, room_type
+                                     FROM rooms
+                                     WHERE id = :room_id
+                                     """), {"room_id": room_id})
+
+        room = room_check.fetchone()
+        if not room:
+            raise HTTPException(status_code=404, detail=f"Room with id {room_id} not found")
+
+        # Получаем ВСЕ бронирования ТОЛЬКО для ЭТОЙ комнаты
+        bookings_result = db.execute(text("""
+                                          SELECT id, room_id, start_date, end_date, guest_name, notes, created_at
+                                          FROM bookings
+                                          WHERE room_id = :room_id
+                                          ORDER BY start_date DESC
+                                          """), {"room_id": room_id})
+
+        bookings = []
+        for b in bookings_result:
+            bookings.append({
+                "id": b.id,
+                "room_id": b.room_id,
+                "start_date": str(b.start_date),
+                "end_date": str(b.end_date),
+                "guest_name": b.guest_name or "",
+                "notes": b.notes or "",
+                "created_at": b.created_at.isoformat() if b.created_at else None
+            })
+
+        return {
+            "room": {
+                "id": room.id,
+                "room_number": room.room_number,
+                "room_type": room.room_type
+            },
+            "bookings": bookings,
+            "total": len(bookings)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_room_bookings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 @rooms_router.get("/{room_id}")
 async def get_room(room_id: int, db: Session = Depends(get_db)):
     """Получить комнату по ID"""
@@ -694,6 +751,125 @@ async def root():
 async def api_root():
     return {"message": "API is running", "version": "2.0.0"}
 
+@rooms_router.get("")
+@rooms_router.get("/")
+async def get_rooms(
+        room_type: Optional[str] = None,
+        status: Optional[str] = None,
+        db: Session = Depends(get_db)
+):
+    """Получить все комнаты с фильтрами"""
+    try:
+        from sqlalchemy import text
+
+        # Базовый SQL запрос
+        base_query = """
+                     SELECT r.id,
+                            r.room_number,
+                            r.room_type,
+                            COALESCE(r.capacity, 2)             as capacity,
+                            COALESCE(r.price_per_night, 500000) as price_per_night,
+                            COALESCE(r.description, '')         as description,
+                            COALESCE(r.amenities, '')           as amenities,
+                            r.created_at,
+                            r.updated_at
+                     FROM rooms r
+                     """
+
+        # Добавляем фильтры
+        conditions = []
+        params = {}
+
+        if room_type:
+            conditions.append("r.room_type = :room_type")
+            params['room_type'] = room_type
+
+        if conditions:
+            base_query += " WHERE " + " AND ".join(conditions)
+
+        base_query += " ORDER BY r.id"
+
+        # Выполняем запрос
+        result = db.execute(text(base_query), params)
+
+        rooms = []
+        type_map = {
+            'STANDARD_2': "2 o'rinli standart",
+            'STANDARD_4': "4 o'rinli standart",
+            'LUX_2': "2 o'rinli lyuks",
+            'VIP_SMALL_4': "4 o'rinli kichik VIP",
+            'VIP_BIG_4': "4 o'rinli katta VIP",
+            'APARTMENT_4': "4 o'rinli apartament",
+            'COTTAGE_6': "Kottedj (6 kishi uchun)",
+            'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
+        }
+
+        # Получаем ВСЕ текущие бронирования одним запросом для оптимизации
+        today = date.today()
+        current_bookings_query = db.execute(text("""
+                                                 SELECT DISTINCT b.room_id,
+                                                                 b.id as booking_id,
+                                                                 b.guest_name,
+                                                                 b.start_date,
+                                                                 b.end_date
+                                                 FROM bookings b
+                                                 WHERE b.start_date <= :today
+                                                   AND b.end_date > :today
+                                                 """), {"today": today})
+
+        # Создаем словарь текущих бронирований по room_id
+        current_bookings = {}
+        for cb in current_bookings_query:
+            current_bookings[cb.room_id] = {
+                "id": cb.booking_id,
+                "guest_name": cb.guest_name,
+                "start_date": str(cb.start_date),
+                "end_date": str(cb.end_date)
+            }
+
+        for row in result:
+            # Проверяем и конвертируем тип комнаты
+            room_type_display = type_map.get(row.room_type, row.room_type)
+
+            # ВАЖНО: Проверяем доступность ТОЛЬКО для ЭТОЙ комнаты по её ID
+            room_id = row.id
+            is_available = room_id not in current_bookings
+            current_booking = current_bookings.get(room_id, None)
+
+            # Применяем фильтр по статусу если нужно
+            if status:
+                if status == "available" and not is_available:
+                    continue
+                elif status == "occupied" and is_available:
+                    continue
+
+            rooms.append({
+                "id": room_id,
+                "room_number": row.room_number,
+                "room_type": room_type_display,
+                "capacity": row.capacity,
+                "price_per_night": float(row.price_per_night),
+                "description": row.description,
+                "amenities": row.amenities,
+                "created_at": row.created_at.isoformat() if row.created_at else "2024-01-01T00:00:00",
+                "updated_at": row.updated_at.isoformat() if row.updated_at else "2024-01-01T00:00:00",
+                "is_available": is_available,  # Доступность КОНКРЕТНОЙ комнаты
+                "current_booking": current_booking  # Текущее бронирование ЭТОЙ комнаты
+            })
+
+        logger.info(f"Returning {len(rooms)} rooms")
+        # Для отладки выведем статус каждой комнаты
+        for r in rooms[:5]:  # Первые 5 комнат для отладки
+            logger.info(
+                f"Room #{r['room_number']} (ID: {r['id']}): available={r['is_available']}, booking={r['current_booking'] is not None}")
+
+        return rooms
+
+    except Exception as e:
+        logger.error(f"Error in get_rooms: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 @app.get("/api/test-booking-conflicts")
 async def test_booking_conflicts(
@@ -783,6 +959,7 @@ async def test_booking_conflicts(
     except Exception as e:
         return {"error": str(e)}
 
-
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
