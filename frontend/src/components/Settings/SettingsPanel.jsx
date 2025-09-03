@@ -344,7 +344,5 @@ export function SettingsPanel() {
         </CardContent>
       </Card>
         </>
-      )}
-    </div>
-  );
+      );
 }
