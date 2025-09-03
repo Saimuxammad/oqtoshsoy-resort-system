@@ -29,7 +29,7 @@ export const bookingService = {
     }
   },
 
-  // Create booking
+  // Create booking - используем v2 эндпоинт с новой логикой
   createBooking: async (booking) => {
     try {
       console.log('[BookingService] Creating booking:', booking);
@@ -43,11 +43,20 @@ export const bookingService = {
         notes: booking.notes || ''
       };
 
-      const response = await api.post('/bookings', bookingData);
+      // Используем новый эндпоинт /bookings/v2
+      const response = await api.post('/bookings/v2', bookingData);
       console.log('[BookingService] Booking created:', response.data);
       return response.data;
     } catch (error) {
       console.error('[BookingService] createBooking error:', error);
+
+      // Если v2 не работает, пробуем обычный эндпоинт
+      if (error.response?.status === 404) {
+        console.log('[BookingService] v2 endpoint not found, trying regular endpoint');
+        const response = await api.post('/bookings', booking);
+        return response.data;
+      }
+
       throw error;
     }
   },

@@ -283,6 +283,119 @@ async def get_bookings(db: Session = Depends(get_db)):
         return []
 
 
+@bookings_router.post("/v2")
+async def create_booking_v2(booking_data: BookingCreate, db: Session = Depends(get_db)):
+    """Создать новое бронирование с исправленной логикой проверки"""
+    try:
+        from sqlalchemy import text
+
+        # Используем НОВУЮ логику проверки (< и > вместо <= и >=)
+        check = db.execute(text("""
+                                SELECT COUNT(*)
+                                FROM bookings
+                                WHERE room_id = :room_id
+                                  AND start_date < :end_date
+                                  AND end_date > :start_date
+                                """), {
+                               "room_id": booking_data.room_id,
+                               "start_date": booking_data.start_date,
+                               "end_date": booking_data.end_date
+                           })
+
+        if check.scalar() > 0:
+            # Проверяем детально какие конфликты
+            conflicts = db.execute(text("""
+                                        SELECT id, start_date, end_date, guest_name
+                                        FROM bookings
+                                        WHERE room_id = :room_id
+                                          AND start_date < :end_date
+                                          AND end_date > :start_date
+                                        """), {
+                                       "room_id": booking_data.room_id,
+                                       "start_date": booking_data.start_date,
+                                       "end_date": booking_data.end_date
+                                   })
+
+            conflict_details = []
+            for c in conflicts:
+                conflict_details.append({
+                    "id": c.id,
+                    "dates": f"{c.start_date} - {c.end_date}",
+                    "guest": c.guest_name
+                })
+
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Room is not available for selected dates",
+                    "conflicts": conflict_details
+                }
+            )
+
+        # Создаем бронирование
+        result = db.execute(text("""
+                                 INSERT INTO bookings (room_id, start_date, end_date, guest_name, notes, created_by,
+                                                       created_at, updated_at)
+                                 VALUES (:room_id, :start_date, :end_date, :guest_name, :notes, :created_by, NOW(),
+                                         NOW()) RETURNING id
+                                 """), {
+                                "room_id": booking_data.room_id,
+                                "start_date": booking_data.start_date,
+                                "end_date": booking_data.end_date,
+                                "guest_name": booking_data.guest_name,
+                                "notes": booking_data.notes,
+                                "created_by": 1
+                            })
+
+        booking_id = result.scalar()
+        db.commit()
+
+        # Возвращаем созданное бронирование
+        booking = db.execute(text("""
+                                  SELECT b.*,
+                                         r.room_number,
+                                         r.room_type
+                                  FROM bookings b
+                                           LEFT JOIN rooms r ON b.room_id = r.id
+                                  WHERE b.id = :id
+                                  """), {"id": booking_id}).fetchone()
+
+        type_map = {
+            'STANDARD_2': "2 o'rinli standart",
+            'STANDARD_4': "4 o'rinli standart",
+            'LUX_2': "2 o'rinli lyuks",
+            'VIP_SMALL_4': "4 o'rinli kichik VIP",
+            'VIP_BIG_4': "4 o'rinli katta VIP",
+            'APARTMENT_4': "4 o'rinli apartament",
+            'COTTAGE_6': "Kottedj (6 kishi uchun)",
+            'PRESIDENT_8': "Prezident apartamenti (8 kishi uchun)"
+        }
+
+        return {
+            "id": booking.id,
+            "room_id": booking.room_id,
+            "start_date": str(booking.start_date),
+            "end_date": str(booking.end_date),
+            "guest_name": booking.guest_name,
+            "notes": booking.notes,
+            "created_by": booking.created_by,
+            "created_at": booking.created_at.isoformat() if booking.created_at else None,
+            "updated_at": booking.updated_at.isoformat() if booking.updated_at else None,
+            "room": {
+                "id": booking.room_id,
+                "room_number": booking.room_number,
+                "room_type": type_map.get(booking.room_type, booking.room_type)
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating booking v2: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @bookings_router.post("")
 @bookings_router.post("/")
 async def create_booking(booking_data: BookingCreate, db: Session = Depends(get_db)):
@@ -655,6 +768,81 @@ async def test_booking_conflicts(
 
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.get("/api/test-create-booking")
+async def test_create_booking(
+        room_id: int,
+        start_date: str,
+        end_date: str,
+        guest_name: str = "Test",
+        db: Session = Depends(get_db)
+):
+    """Тестовый эндпоинт для создания бронирования GET запросом"""
+    try:
+        from sqlalchemy import text
+
+        # Проверяем конфликты с новой логикой
+        conflicts = db.execute(text("""
+                                    SELECT id, start_date, end_date
+                                    FROM bookings
+                                    WHERE room_id = :room_id
+                                      AND start_date < :end_date
+                                      AND end_date > :start_date
+                                    """), {
+                                   "room_id": room_id,
+                                   "start_date": start_date,
+                                   "end_date": end_date
+                               })
+
+        conflict_list = []
+        for c in conflicts:
+            conflict_list.append({
+                "id": c.id,
+                "dates": f"{c.start_date} - {c.end_date}"
+            })
+
+        if len(conflict_list) > 0:
+            return {
+                "status": "conflict",
+                "message": "Conflicts found with new logic",
+                "conflicts": conflict_list
+            }
+
+        # Создаем бронирование
+        result = db.execute(text("""
+                                 INSERT INTO bookings (room_id, start_date, end_date, guest_name, notes, created_by,
+                                                       created_at, updated_at)
+                                 VALUES (:room_id, :start_date, :end_date, :guest_name, 'Test booking', 1, NOW(),
+                                         NOW()) RETURNING id
+                                 """), {
+                                "room_id": room_id,
+                                "start_date": start_date,
+                                "end_date": end_date,
+                                "guest_name": guest_name
+                            })
+
+        booking_id = result.scalar()
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "Booking created successfully",
+            "booking_id": booking_id,
+            "details": {
+                "room_id": room_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "guest_name": guest_name
+            }
+        }
+
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 
 if __name__ == "__main__":
