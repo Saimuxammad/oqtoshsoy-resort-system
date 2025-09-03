@@ -57,7 +57,7 @@ export function AnalyticsDashboard() {
         name: type.replace("o'rinli", "o'r"),
         total: data.total,
         band: data.occupied,
-        bo'sh: data.total - data.occupied
+        bosh: data.total - data.occupied
       }));
 
       // Данные по месяцам (последние 6 месяцев)
@@ -183,7 +183,7 @@ export function AnalyticsDashboard() {
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="band" fill="#3B82F6" name="Band" />
-                <Bar dataKey="bo'sh" fill="#10B981" name="Bo'sh" />
+                <Bar dataKey="bosh" fill="#10B981" name="Bo'sh" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
