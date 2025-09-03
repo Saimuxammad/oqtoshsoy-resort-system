@@ -252,7 +252,7 @@ export function AnalyticsDashboard() {
                       <td className="px-4 py-2 text-sm text-gray-900">{type.name}</td>
                       <td className="px-4 py-2 text-sm text-gray-900">{type.total}</td>
                       <td className="px-4 py-2 text-sm text-gray-900">{type.band}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900">{type.bo'sh}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{type.bosh}</td>
                       <td className="px-4 py-2 text-sm text-gray-900">
                         {type.total > 0 ? Math.round((type.band / type.total) * 100) : 0}%
                       </td>
