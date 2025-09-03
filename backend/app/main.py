@@ -290,3 +290,47 @@ async def internal_error_handler(request, exc):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+@app.get("/api/migrate-room-types")
+async def migrate_room_types(db: Session = Depends(get_db)):
+    """Migrate room types from enum to string"""
+    try:
+        from sqlalchemy import text
+
+        # Получаем текущие комнаты
+        result = db.execute(text("SELECT id, room_type::text FROM rooms"))
+        rooms = result.fetchall()
+
+        # Мапинг старых значений на новые
+        type_map = {
+            'STANDARD_DOUBLE': "2 o'rinli standart",
+            'STANDARD_QUAD': "4 o'rinli standart",
+            'LUX_DOUBLE': "2 o'rinli lyuks",
+            'VIP_SMALL': "4 o'rinli kichik VIP",
+            'VIP_LARGE': "4 o'rinli katta VIP",
+            'APARTMENT': "4 o'rinli apartament",
+            'COTTAGE': "Kottedj (6 kishi uchun)",
+            'PRESIDENT': "Prezident apartamenti (8 kishi uchun)"
+        }
+
+        updated = 0
+        for room_id, room_type in rooms:
+            new_type = type_map.get(room_type, room_type)
+            # Используем параметризованный запрос для безопасности
+            db.execute(
+                text("UPDATE rooms SET room_type = :new_type WHERE id = :room_id"),
+                {"new_type": new_type, "room_id": room_id}
+            )
+            updated += 1
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": f"Updated {updated} rooms",
+            "rooms_migrated": updated
+        }
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}

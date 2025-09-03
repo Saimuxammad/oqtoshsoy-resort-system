@@ -1,19 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, Text, Enum as SQLEnum, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime
 from sqlalchemy.orm import relationship
 from ..database import Base
 from datetime import datetime
-import enum
-
-
-class RoomType(enum.Enum):
-    STANDARD_DOUBLE = "2 o'rinli standart"
-    STANDARD_QUAD = "4 o'rinli standart"
-    LUX_DOUBLE = "2 o'rinli lyuks"
-    VIP_SMALL = "4 o'rinli kichik VIP"
-    VIP_LARGE = "4 o'rinli katta VIP"
-    APARTMENT = "4 o'rinli apartament"
-    COTTAGE = "Kottedj (6 kishi uchun)"
-    PRESIDENT = "Prezident apartamenti (8 kishi uchun)"
 
 
 class Room(Base):
@@ -21,9 +9,10 @@ class Room(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     room_number = Column(String, unique=True, index=True)
-    room_type = Column(SQLEnum(RoomType))
-    capacity = Column(Integer, nullable=False)  # Добавляем поле capacity
-    price_per_night = Column(Float)
+    # Используем String вместо Enum для избежания проблем с PostgreSQL
+    room_type = Column(String, nullable=False)
+    capacity = Column(Integer, nullable=False, default=2)
+    price_per_night = Column(Float, default=500000)
     description = Column(Text, nullable=True)
     amenities = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
