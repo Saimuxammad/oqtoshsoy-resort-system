@@ -4,45 +4,40 @@ from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
-import os
 
 from ..database import get_db
 from ..models.user import User, UserRole
 
-# Security
-security = HTTPBearer(auto_error=False)
-
-# Получаем секретный ключ из переменной окружения
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
+# JWT settings
+SECRET_KEY = "your-secret-key-here"  # В production используйте переменную окружения
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 часа
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
+
+security = HTTPBearer()
 
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Создание JWT токена"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-async def get_current_user_optional(
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+async def get_current_user(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
         db: Session = Depends(get_db)
-) -> Optional[User]:
-    """Получение текущего пользователя (опционально)"""
-    if not credentials:
-        return None
-
+) -> User:
+    """Получение текущего пользователя из токена"""
     token = credentials.credentials
 
-    # Специальная обработка для dev токена
-    if token == "dev_token" or token.startswith("dev_token"):
-        # В dev режиме возвращаем тестового админа
+    # Для dev режима
+    if token == "dev_token" or token == "dev_token_123456":
+        # Возвращаем тестового админа
         test_user = db.query(User).filter(User.telegram_id == 123456789).first()
         if not test_user:
             test_user = User(
@@ -56,58 +51,69 @@ async def get_current_user_optional(
             )
             db.add(test_user)
             db.commit()
+            db.refresh(test_user)
         return test_user
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("user_id")
         if user_id is None:
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
     except JWTError:
-        return None
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_active:
-        return None
-
-    return user
-
-
-async def get_current_user(
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-        db: Session = Depends(get_db)
-) -> User:
-    """Получение текущего пользователя (обязательно)"""
-    user = await get_current_user_optional(credentials, db)
-
-    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
+            detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user"
         )
 
     return user
 
 
-# Декораторы для проверки прав доступа
-async def require_operator(
-        current_user: User = Depends(get_current_user)
-) -> User:
-    """Требование прав оператора или выше"""
-    if not current_user.can_create_bookings:
+def require_permission(permission: str):
+    """Декоратор для проверки разрешений"""
+
+    async def permission_checker(current_user: User = Depends(get_current_user)):
+        if not current_user.has_permission(permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You don't have permission to {permission}"
+            )
+        return current_user
+
+    return permission_checker
+
+
+# Готовые проверки для разных ролей
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Требует роль админа или выше"""
+    if current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operator access required"
+            detail="Admin access required"
         )
     return current_user
 
 
-async def require_manager(
-        current_user: User = Depends(get_current_user)
-) -> User:
-    """Требование прав менеджера или выше"""
-    if not current_user.can_edit_bookings:
+async def require_manager(current_user: User = Depends(get_current_user)) -> User:
+    """Требует роль менеджера или выше"""
+    if current_user.role not in [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Manager access required"
@@ -115,47 +121,11 @@ async def require_manager(
     return current_user
 
 
-async def require_admin(
-        current_user: User = Depends(get_current_user)
-) -> User:
-    """Требование прав администратора или выше"""
-    if not current_user.can_manage_settings:
+async def require_operator(current_user: User = Depends(get_current_user)) -> User:
+    """Требует роль оператора или выше"""
+    if current_user.role == UserRole.USER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Administrator access required"
+            detail="Operator access required"
         )
     return current_user
-
-
-async def require_super_admin(
-        current_user: User = Depends(get_current_user)
-) -> User:
-    """Требование прав супер-администратора"""
-    if not current_user.can_manage_users:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Super Administrator access required"
-        )
-    return current_user
-
-
-# Вспомогательные функции для проверки прав
-def check_booking_permission(user: User, booking, action: str) -> bool:
-    """Проверка прав на действие с бронированием"""
-    if action == "create":
-        return user.can_create_bookings
-    elif action == "edit":
-        if user.can_delete_any_booking:
-            return True
-        if user.can_edit_bookings:
-            return booking.created_by == user.id
-        return False
-    elif action == "delete":
-        if user.can_delete_any_booking:
-            return True
-        if user.can_delete_bookings:
-            return booking.created_by == user.id
-        return False
-    elif action == "view":
-        return True  # Все могут просматривать
-    return False

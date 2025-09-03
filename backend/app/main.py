@@ -76,7 +76,136 @@ app.add_middleware(
 rooms_router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 bookings_router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
+# Добавьте эти изменения в ваш backend/app/main.py в раздел bookings_router
 
+from .utils.dependencies import get_current_user, require_permission, require_operator
+
+
+@bookings_router.get("")
+@bookings_router.get("/")
+async def get_bookings(
+        current_user: User = Depends(get_current_user),  # Добавляем проверку авторизации
+        db: Session = Depends(get_db)
+):
+    """Получить все бронирования"""
+    try:
+        from sqlalchemy import text
+
+        # Если пользователь не менеджер и выше, показываем только его бронирования
+        if current_user.role == UserRole.USER:
+            result = db.execute(text("""
+                                     SELECT b.id,
+                                            b.room_id,
+                                            b.start_date,
+                                            b.end_date,
+                                            b.guest_name,
+                                            b.notes,
+                                            b.created_by,
+                                            b.created_at,
+                                            b.updated_at,
+                                            r.room_number,
+                                            r.room_type
+                                     FROM bookings b
+                                              LEFT JOIN rooms r ON b.room_id = r.id
+                                     WHERE b.created_by = :user_id
+                                     ORDER BY b.start_date DESC
+                                     """), {"user_id": current_user.id})
+        else:
+            # Менеджеры и выше видят все бронирования
+            result = db.execute(text("""
+                                     SELECT b.id,
+                                            b.room_id,
+                                            b.start_date,
+                                            b.end_date,
+                                            b.guest_name,
+                                            b.notes,
+                                            b.created_by,
+                                            b.created_at,
+                                            b.updated_at,
+                                            r.room_number,
+                                            r.room_type
+                                     FROM bookings b
+                                              LEFT JOIN rooms r ON b.room_id = r.id
+                                     ORDER BY b.start_date DESC
+                                     """))
+
+        # ... остальная часть функции остается без изменений
+
+
+@bookings_router.post("")
+@bookings_router.post("/")
+async def create_booking(
+        booking_data: BookingCreate,
+        current_user: User = Depends(require_operator),  # Минимум оператор
+        db: Session = Depends(get_db)
+):
+    """Создать новое бронирование - требует роль оператора или выше"""
+    # ... остальной код без изменений, но используем current_user.id для created_by
+
+
+@bookings_router.delete("/{booking_id}")
+async def delete_booking(
+        booking_id: int,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Удалить бронирование"""
+    try:
+        from sqlalchemy import text
+
+        # Получаем бронирование
+        check = db.execute(text("SELECT * FROM bookings WHERE id = :id"), {"id": booking_id})
+        booking = check.fetchone()
+
+        if not booking:
+            raise HTTPException(status_code=404, detail="Booking not found")
+
+        # Проверяем права на удаление
+        if not current_user.can_delete_booking(booking):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to delete this booking"
+            )
+
+        db.execute(text("DELETE FROM bookings WHERE id = :id"), {"id": booking_id})
+        db.commit()
+
+        logger.info(f"User {current_user.id} deleted booking {booking_id}")
+        return {"message": "Booking deleted successfully", "id": booking_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting booking {booking_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@bookings_router.put("/{booking_id}")
+@bookings_router.patch("/{booking_id}")
+async def update_booking(
+        booking_id: int,
+        booking_data: BookingUpdate,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Обновить бронирование"""
+    try:
+        from sqlalchemy import text
+
+        check = db.execute(text("SELECT * FROM bookings WHERE id = :id"), {"id": booking_id})
+        existing = check.fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Booking not found")
+
+        # Проверяем права на редактирование
+        if not current_user.can_edit_booking(existing):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to edit this booking"
+            )
+
+        # ... остальной код обновления без изменений
 @rooms_router.get("")
 @rooms_router.get("/")
 async def get_rooms(
