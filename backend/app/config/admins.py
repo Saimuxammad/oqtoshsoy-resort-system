@@ -2,29 +2,26 @@
 """
 Конфигурация пользователей системы и их ролей
 """
+import os
 
 # Telegram IDs администраторов и пользователей
-# Замените эти ID на реальные Telegram ID ваших пользователей
-
 SUPER_ADMINS = [
-    5488749868,  # Главный администратор - замените на ваш Telegram ID
+    5488749868,  # Ваш Telegram ID
 ]
 
 ADMINS = [
-    123456789,  # Администратор 1
-    # 987654321,  # Администратор 2 (добавьте при необходимости)
+    # Добавьте сюда ID других администраторов если нужно
 ]
 
 MANAGERS = [
-    # 111111111,  # Менеджер 1
+    # Добавьте сюда ID менеджеров если нужно
 ]
 
 OPERATORS = [
-    # 222222222,  # Оператор 1
-    # 333333333,  # Оператор 2
+    # Добавьте сюда ID операторов если нужно
 ]
 
-# Все разрешенные пользователи (3-4 человека как вы указали)
+# Все разрешенные пользователи (3-4 человека)
 ALLOWED_USERS = SUPER_ADMINS + ADMINS + MANAGERS + OPERATORS
 
 
@@ -50,13 +47,24 @@ def is_operator(telegram_id: int) -> bool:
 
 def is_allowed_user(telegram_id: int) -> bool:
     """Проверяет, разрешен ли доступ пользователю к системе"""
-    # В режиме разработки разрешаем доступ всем
-    import os
-    if os.getenv("ENVIRONMENT", "development") == "development":
+    # Используем отдельную переменную для контроля доступа
+    access_control = os.getenv("ACCESS_CONTROL", "strict")
+
+    # Если ACCESS_CONTROL=open, пускаем всех (только для тестирования!)
+    if access_control == "open":
+        print(f"WARNING: Access control is OPEN! User {telegram_id} allowed.")
         return True
 
-    # В продакшене проверяем список разрешенных пользователей
-    return telegram_id in ALLOWED_USERS
+    # По умолчанию и при ACCESS_CONTROL=strict проверяем список
+    is_allowed = telegram_id in ALLOWED_USERS
+
+    if not is_allowed:
+        print(f"Access DENIED for Telegram ID: {telegram_id}")
+        print(f"Add this ID to ALLOWED_USERS to grant access")
+    else:
+        print(f"Access GRANTED for Telegram ID: {telegram_id}")
+
+    return is_allowed
 
 
 def get_user_role(telegram_id: int) -> str:

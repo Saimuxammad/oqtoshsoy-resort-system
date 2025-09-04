@@ -11,7 +11,10 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from .database import engine, get_db
-
+# Добавьте эти импорты в начало main.py
+from fastapi.responses import StreamingResponse
+import io
+import pandas as pd
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,6 +79,209 @@ app.add_middleware(
 rooms_router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 bookings_router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
+
+# Добавьте этот эндпоинт в main.py после других эндпоинтов
+
+@app.get("/api/export/bookings")
+async def export_bookings_to_excel(
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        db: Session = Depends(get_db)
+):
+    """Экспорт всех бронирований в Excel файл"""
+    try:
+        from sqlalchemy import text
+
+        # Базовый запрос
+        query = """
+                SELECT b.id          as "Bron ID", \
+                       r.room_number as "Xona raqami", \
+                       r.room_type   as "Xona turi", \
+                       b.guest_name  as "Mehmon ismi", \
+                       b.start_date  as "Kirish sanasi", \
+                       b.end_date    as "Chiqish sanasi", \
+                       b.notes       as "Izohlar", \
+                       b.created_at  as "Yaratilgan vaqt", \
+                       CASE \
+                           WHEN b.start_date <= CURRENT_DATE AND b.end_date > CURRENT_DATE \
+                               THEN 'Band' \
+                           WHEN b.end_date < CURRENT_DATE \
+                               THEN 'Tugagan' \
+                           ELSE 'Kutilmoqda' \
+                           END       as "Status"
+                FROM bookings b
+                         LEFT JOIN rooms r ON b.room_id = r.id \
+                """
+
+        conditions = []
+        params = {}
+
+        if start_date:
+            conditions.append("b.start_date >= :start_date")
+            params['start_date'] = start_date
+
+        if end_date:
+            conditions.append("b.end_date <= :end_date")
+            params['end_date'] = end_date
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY b.created_at DESC"
+
+        # Выполняем запрос
+        result = db.execute(text(query), params)
+
+        # Преобразуем в DataFrame
+        df = pd.DataFrame(result.fetchall())
+
+        if df.empty:
+            # Если нет данных, создаем пустой DataFrame с нужными колонками
+            df = pd.DataFrame(columns=[
+                "Bron ID", "Xona raqami", "Xona turi", "Mehmon ismi",
+                "Kirish sanasi", "Chiqish sanasi", "Izohlar",
+                "Yaratilgan vaqt", "Status"
+            ])
+
+        # Создаем Excel файл в памяти
+        output = io.BytesIO()
+
+        # Используем ExcelWriter для форматирования
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name='Bronlar', index=False)
+
+            # Получаем workbook и worksheet
+            workbook = writer.book
+            worksheet = writer.sheets['Bronlar']
+
+            # Форматы
+            header_format = workbook.add_format({
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'top',
+                'fg_color': '#4472C4',
+                'font_color': 'white',
+                'border': 1
+            })
+
+            date_format = workbook.add_format({'num_format': 'dd.mm.yyyy'})
+
+            # Применяем форматы к заголовкам
+            for col_num, value in enumerate(df.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+
+            # Устанавливаем ширину колонок
+            worksheet.set_column('A:A', 10)  # Bron ID
+            worksheet.set_column('B:B', 15)  # Xona raqami
+            worksheet.set_column('C:C', 25)  # Xona turi
+            worksheet.set_column('D:D', 30)  # Mehmon ismi
+            worksheet.set_column('E:F', 15)  # Sanalar
+            worksheet.set_column('G:G', 40)  # Izohlar
+            worksheet.set_column('H:H', 20)  # Yaratilgan vaqt
+            worksheet.set_column('I:I', 15)  # Status
+
+        # Возвращаем файл
+        output.seek(0)
+
+        filename = f"bronlar_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        return StreamingResponse(
+            io.BytesIO(output.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        logger.error(f"Error exporting bookings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/export/rooms")
+async def export_rooms_to_excel(db: Session = Depends(get_db)):
+    """Экспорт информации о комнатах в Excel файл"""
+    try:
+        from sqlalchemy import text
+
+        today = date.today()
+
+        query = """
+                SELECT r.id              as "ID", \
+                       r.room_number     as "Xona raqami", \
+                       r.room_type       as "Xona turi", \
+                       r.capacity        as "Sig'im", \
+                       r.price_per_night as "Kunlik narx", \
+                       CASE \
+                           WHEN EXISTS (SELECT 1 \
+                                        FROM bookings b \
+                                        WHERE b.room_id = r.id \
+                                          AND b.start_date <= :today \
+                                          AND b.end_date > :today) THEN 'Band' \
+                           ELSE 'Bo''sh' \
+                           END           as "Holati", \
+                       r.description     as "Tavsif", \
+                       r.amenities       as "Qulayliklar"
+                FROM rooms r
+                ORDER BY r.id \
+                """
+
+        result = db.execute(text(query), {"today": today})
+
+        # Преобразуем в DataFrame
+        df = pd.DataFrame(result.fetchall())
+
+        if df.empty:
+            df = pd.DataFrame(columns=[
+                "ID", "Xona raqami", "Xona turi", "Sig'im",
+                "Kunlik narx", "Holati", "Tavsif", "Qulayliklar"
+            ])
+
+        # Создаем Excel файл
+        output = io.BytesIO()
+
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name='Xonalar', index=False)
+
+            workbook = writer.book
+            worksheet = writer.sheets['Xonalar']
+
+            # Форматы
+            header_format = workbook.add_format({
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'top',
+                'fg_color': '#4472C4',
+                'font_color': 'white',
+                'border': 1
+            })
+
+            money_format = workbook.add_format({'num_format': '#,##0'})
+
+            # Заголовки
+            for col_num, value in enumerate(df.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+
+            # Ширина колонок
+            worksheet.set_column('A:A', 8)  # ID
+            worksheet.set_column('B:B', 15)  # Xona raqami
+            worksheet.set_column('C:C', 25)  # Xona turi
+            worksheet.set_column('D:D', 10)  # Sig'im
+            worksheet.set_column('E:E', 15)  # Kunlik narx
+            worksheet.set_column('F:F', 10)  # Holati
+            worksheet.set_column('G:H', 30)  # Tavsif va Qulayliklar
+
+        output.seek(0)
+
+        filename = f"xonalar_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        return StreamingResponse(
+            io.BytesIO(output.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        logger.error(f"Error exporting rooms: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @rooms_router.get("")
 @rooms_router.get("/")
