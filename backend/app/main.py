@@ -94,7 +94,7 @@ async def get_rooms(
         room_type: Optional[str] = None,
         status: Optional[str] = None,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # Требуем авторизацию
+
 ):
     """Получить все комнаты с фильтрами"""
     try:
@@ -280,7 +280,7 @@ async def get_bookings(
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # Требуем авторизацию
+
 ):
     """Получить все бронирования с возможностью фильтрации"""
     try:
@@ -529,7 +529,25 @@ async def delete_booking(
         logger.error(f"Error deleting booking {booking_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# 4. Добавьте этот эндпоинт для проверки авторизации:
+@app.get("/api/auth/check")
+async def check_auth():
+    """Проверка доступности API без авторизации"""
+    return {"status": "ok", "auth_required": False}
 
+# 5. Измените auth placeholder на рабочий:
+@app.get("/api/auth/login")
+async def auth_placeholder():
+    """Временный токен для разработки"""
+    return {
+        "token": "dev_token_123",
+        "user": {
+            "id": 1,
+            "name": "Test User",
+            "telegram_id": 123456789,
+            "is_admin": False
+        }
+    }
 @bookings_router.put("/{booking_id}")
 @bookings_router.patch("/{booking_id}")
 async def update_booking(
