@@ -902,7 +902,6 @@ async def update_booking(booking_id: int, booking_data: BookingUpdate, db: Sessi
 
 
 # Регистрируем роутеры
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(rooms_router)
 app.include_router(bookings_router)
 

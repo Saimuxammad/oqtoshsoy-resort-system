@@ -79,7 +79,7 @@ export function Header({ currentUser, onLogout }) {
               <div className="text-right">
                 <div className="flex items-center gap-2">
                   <UserIcon className="h-5 w-5" />
-                  <span className="font-medium">{currentUser.first_name || currentUser.name || 'User'}</span>
+                  <span className="font-medium">{currentUser.name}</span>
                 </div>
                 <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(currentUser.role)}`}>
                   {currentUser.role}

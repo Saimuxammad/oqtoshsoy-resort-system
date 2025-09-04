@@ -1,4 +1,4 @@
-import api from './api';
+import { setAuthToken } from '../utils/api';
 
 export const authService = {
   authenticate: async (initData) => {
@@ -7,60 +7,76 @@ export const authService = {
 
       // Для Telegram WebApp
       if (initData) {
-        const response = await api.post('/auth/telegram', { initData });
-        const { token, user } = response.data;
+        const url = 'https://oqtoshsoy-resort-system-production.up.railway.app/api/auth/telegram';
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ initData })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw { response: { status: response.status, data: errorData } };
+        }
+
+        const { token, user } = await response.json();
 
         // Сохраняем токен
-        if (token) {
-          localStorage.setItem('auth_token', token);
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        }
+        setAuthToken(token);
 
         return { token, user };
       }
 
-      // Для dev режима (без Telegram)
+      // Для dev режима
       console.log('Dev mode - using mock auth');
-      const mockUser = {
-        id: 1,
-        telegram_id: 5488749868,
-        first_name: 'Dev',
-        last_name: 'User',
-        is_admin: true,
-        can_modify: true
-      };
+      const mockToken = 'dev_token_' + Date.now();
+      setAuthToken(mockToken);
 
       return {
-        token: 'dev_token',
-        user: mockUser
+        token: mockToken,
+        user: {
+          id: 1,
+          first_name: 'Dev',
+          last_name: 'User',
+          is_admin: true
+        }
       };
     } catch (error) {
       console.error('Authentication error:', error);
 
-      // Возвращаем тестового пользователя при ошибке
-      const fallbackUser = {
-        id: 1,
-        telegram_id: 5488749868,
-        first_name: 'Guest',
-        last_name: 'User',
-        is_admin: false,
-        can_modify: false
-      };
+      // Пробрасываем ошибку 403
+      if (error.response?.status === 403) {
+        throw error;
+      }
+
+      // В случае других ошибок все равно позволяем работать в dev режиме
+      const fallbackToken = 'fallback_token_' + Date.now();
+      setAuthToken(fallbackToken);
 
       return {
-        token: 'fallback_token',
-        user: fallbackUser
+        token: fallbackToken,
+        user: {
+          id: 1,
+          first_name: 'Guest',
+          last_name: 'User',
+          is_admin: false
+        }
       };
     }
   },
 
   logout: () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('current_user');
+    setAuthToken(null);
+    localStorage.clear();
     sessionStorage.clear();
   },
 
   getCurrentUser: () => {
+    // Получаем сохраненного пользователя
     const savedUser = localStorage.getItem('current_user');
     if (savedUser) {
       try {

@@ -6,47 +6,56 @@ import { CalendarDaysIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/out
 import { useMutation, useQueryClient } from 'react-query';
 import { bookingService } from '../../services/bookingService';
 import toast from 'react-hot-toast';
+import { useTelegram } from '../../hooks/useTelegram';
 
-export function RoomCard({ room, onEdit, onViewCalendar, currentUser }) {
+export function RoomCard({ room, onEdit, onViewCalendar }) {
   const queryClient = useQueryClient();
-
-  // Проверяем права доступа
-  const canModify = currentUser?.is_admin || currentUser?.can_modify;
+  const { showConfirm } = useTelegram();
 
   const cancelBookingMutation = useMutation(
-    (bookingId) => bookingService.deleteBooking(bookingId),
+    (bookingId) => {
+      console.log('[RoomCard] Cancelling booking:', bookingId);
+      return bookingService.deleteBooking(bookingId);
+    },
     {
       onSuccess: () => {
+        console.log('[RoomCard] Booking cancelled successfully');
         queryClient.invalidateQueries('rooms');
         queryClient.invalidateQueries('bookings');
         toast.success('Bron bekor qilindi');
       },
       onError: (error) => {
+        console.error('[RoomCard] Cancel booking error:', error);
         toast.error(error.response?.data?.detail || 'Xatolik yuz berdi');
       }
     }
   );
 
   const handleCancelBooking = () => {
-    if (!canModify) {
-      toast.error("Sizda o'chirish huquqi yo'q");
-      return;
-    }
-
     if (room.current_booking?.id) {
-      const confirmed = window.confirm('Bronni bekor qilishni tasdiqlaysizmi?');
-      if (confirmed) {
-        cancelBookingMutation.mutate(room.current_booking.id);
+      console.log('[RoomCard] Current booking:', room.current_booking);
+      console.log('[RoomCard] Booking ID to delete:', room.current_booking.id);
+      console.log('[RoomCard] Current URL:', window.location.href);
+
+      // Проверяем, какой URL будет использован
+      const testUrl = `https://oqtoshsoy-resort-system-production.up.railway.app/api/bookings/${room.current_booking.id}`;
+      console.log('[RoomCard] Will send DELETE to:', testUrl);
+
+      // Используем стандартный confirm, если Telegram метод недоступен
+      if (showConfirm && window.Telegram?.WebApp) {
+        showConfirm('Bronni bekor qilishni tasdiqlaysizmi?', (confirmed) => {
+          if (confirmed) {
+            cancelBookingMutation.mutate(room.current_booking.id);
+          }
+        });
+      } else {
+        // Fallback для браузера
+        const confirmed = window.confirm('Bronni bekor qilishni tasdiqlaysizmi?');
+        if (confirmed) {
+          cancelBookingMutation.mutate(room.current_booking.id);
+        }
       }
     }
-  };
-
-  const handleEdit = () => {
-    if (!canModify) {
-      toast.error("Sizda tahrirlash huquqi yo'q");
-      return;
-    }
-    onEdit(room);
   };
 
   return (
@@ -76,7 +85,7 @@ export function RoomCard({ room, onEdit, onViewCalendar, currentUser }) {
           </div>
 
           <div className="flex gap-2">
-            {room.current_booking && canModify && (
+            {room.current_booking && (
               <Button
                 variant="danger"
                 size="sm"
@@ -87,7 +96,6 @@ export function RoomCard({ room, onEdit, onViewCalendar, currentUser }) {
                 <XMarkIcon className="h-4 w-4" />
               </Button>
             )}
-
             <Button
               variant="ghost"
               size="sm"
@@ -96,17 +104,14 @@ export function RoomCard({ room, onEdit, onViewCalendar, currentUser }) {
             >
               <CalendarDaysIcon className="h-4 w-4" />
             </Button>
-
-            {canModify && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleEdit}
-                title="Tahrirlash"
-              >
-                <PencilIcon className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(room)}
+              title="Tahrirlash"
+            >
+              <PencilIcon className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </CardContent>
