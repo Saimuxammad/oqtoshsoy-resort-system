@@ -1,6 +1,7 @@
 # backend/config/admins.py
 """
 Конфигурация пользователей системы и их ролей
+СТРОГИЙ КОНТРОЛЬ ДОСТУПА
 """
 import os
 
@@ -21,7 +22,7 @@ OPERATORS = [
     # Добавьте сюда ID операторов если нужно
 ]
 
-# Все разрешенные пользователи (3-4 человека)
+# Все разрешенные пользователи - ТОЛЬКО ЭТИ ID МОГУТ ВОЙТИ
 ALLOWED_USERS = SUPER_ADMINS + ADMINS + MANAGERS + OPERATORS
 
 
@@ -46,23 +47,19 @@ def is_operator(telegram_id: int) -> bool:
 
 
 def is_allowed_user(telegram_id: int) -> bool:
-    """Проверяет, разрешен ли доступ пользователю к системе"""
-    # Используем отдельную переменную для контроля доступа
-    access_control = os.getenv("ACCESS_CONTROL", "strict")
-
-    # Если ACCESS_CONTROL=open, пускаем всех (только для тестирования!)
-    if access_control == "open":
-        print(f"WARNING: Access control is OPEN! User {telegram_id} allowed.")
-        return True
-
-    # По умолчанию и при ACCESS_CONTROL=strict проверяем список
+    """
+    ЖЕСТКАЯ ПРОВЕРКА ДОСТУПА
+    Только пользователи из списка ALLOWED_USERS могут войти
+    """
+    # УБИРАЕМ ВСЕ ПРОВЕРКИ ПЕРЕМЕННЫХ - ВСЕГДА СТРОГИЙ РЕЖИМ!
     is_allowed = telegram_id in ALLOWED_USERS
 
     if not is_allowed:
-        print(f"Access DENIED for Telegram ID: {telegram_id}")
-        print(f"Add this ID to ALLOWED_USERS to grant access")
+        print(f"❌ ACCESS DENIED for Telegram ID: {telegram_id}")
+        print(f"   This user is NOT in the allowed list!")
+        print(f"   Allowed IDs: {ALLOWED_USERS}")
     else:
-        print(f"Access GRANTED for Telegram ID: {telegram_id}")
+        print(f"✅ ACCESS GRANTED for Telegram ID: {telegram_id}")
 
     return is_allowed
 

@@ -72,6 +72,8 @@ def verify_telegram_auth(init_data: str) -> dict:
         raise
 
 
+# Найдите в auth.py функцию telegram_auth и замените эту часть:
+
 @router.post("/telegram", response_model=dict)
 async def telegram_auth(
         auth_data: TelegramAuthData,
@@ -91,27 +93,31 @@ async def telegram_auth(
                 detail="Invalid user data"
             )
 
-        # КРИТИЧЕСКИ ВАЖНО: Проверяем ACCESS_CONTROL вместо ENVIRONMENT
-        access_control = os.getenv("ACCESS_CONTROL", "open")
+        # ⚠️ КРИТИЧЕСКИ ВАЖНО: ВСЕГДА ПРОВЕРЯЕМ ДОСТУП!
+        # УБИРАЕМ ВСЕ УСЛОВИЯ - ПРОВЕРКА ВСЕГДА ВКЛЮЧЕНА!
 
-        logger.info(f"Access control mode: {access_control}")
-        logger.info(f"User trying to login: {telegram_id} - {user_data.get('first_name')} {user_data.get('last_name')}")
+        print(f"🔐 Checking access for Telegram ID: {telegram_id}")
+        print(f"   User: {user_data.get('first_name')} {user_data.get('last_name')}")
+        print(f"   Username: @{user_data.get('username', 'no_username')}")
 
-        # Если ACCESS_CONTROL=strict, проверяем список пользователей
-        if access_control == "strict":
-            if not is_allowed_user(telegram_id):
-                # Логируем попытку несанкционированного доступа
-                logger.warning(f"ACCESS DENIED for unauthorized user: {telegram_id}")
-                logger.warning(f"User name: {user_data.get('first_name')} {user_data.get('last_name')}")
-                logger.warning(f"Username: @{user_data.get('username', 'no_username')}")
+        # ЖЕСТКАЯ ПРОВЕРКА - БЕЗ ИСКЛЮЧЕНИЙ!
+        if not is_allowed_user(telegram_id):
+            # Записываем в лог попытку несанкционированного доступа
+            print(f"⛔ UNAUTHORIZED ACCESS ATTEMPT!")
+            print(f"   Telegram ID: {telegram_id}")
+            print(f"   Name: {user_data.get('first_name')} {user_data.get('last_name')}")
+            print(f"   Username: @{user_data.get('username', 'no_username')}")
+            print(f"   Time: {datetime.now()}")
 
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Kirish rad etildi! Sizning Telegram ID ({telegram_id}) ro'yxatda yo'q. Administrator bilan bog'laning."
-                )
-        else:
-            logger.warning(f"ACCESS_CONTROL is {access_control}! Access check disabled!")
+            # БЛОКИРУЕМ ДОСТУП
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"❌ KIRISH RAD ETILDI! Sizning Telegram ID ({telegram_id}) tizimga kirishga ruxsat berilmagan. Administrator bilan bog'laning."
+            )
 
+        print(f"✅ Access granted for Telegram ID: {telegram_id}")
+
+        # Далее код создания/обновления пользователя как обычно...
         user = db.query(User).filter(User.telegram_id == telegram_id).first()
 
         if not user:
@@ -142,7 +148,7 @@ async def telegram_auth(
             db.commit()
             db.refresh(user)
 
-            logger.info(f"New user created: {telegram_id} with role {role.value}")
+            print(f"New user created: {telegram_id} with role {role.value}")
         else:
             # Update existing user info
             user.first_name = user_data.get("first_name", user.first_name)
@@ -163,7 +169,6 @@ async def telegram_auth(
             if new_role != user.role:
                 user.role = new_role
                 user.is_admin = new_role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]
-                logger.info(f"User {telegram_id} role updated to {new_role.value}")
 
             db.commit()
 
@@ -174,7 +179,7 @@ async def telegram_auth(
             expires_delta=access_token_expires
         )
 
-        logger.info(f"User {telegram_id} successfully authenticated with role {user.role.value}")
+        print(f"User {telegram_id} successfully logged in")
 
         return {
             "token": access_token,
@@ -193,23 +198,12 @@ async def telegram_auth(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Authentication error: {e}")
-        # В dev режиме возвращаем тестовый токен
-        if os.getenv("ENVIRONMENT", "development") == "development":
-            return {
-                "token": "dev_token_123456",
-                "token_type": "bearer",
-                "user": {
-                    "id": 1,
-                    "telegram_id": 123456789,
-                    "first_name": "Dev",
-                    "last_name": "User",
-                    "username": "dev_user",
-                    "is_admin": True,
-                    "role": "admin"
-                }
-            }
-        raise
+        print(f"❌ Authentication error: {e}")
+        # УБИРАЕМ ВОЗМОЖНОСТЬ ВХОДА В DEV РЕЖИМЕ!
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication failed"
+        )
 
 
 @router.get("/me", response_model=UserResponse)
