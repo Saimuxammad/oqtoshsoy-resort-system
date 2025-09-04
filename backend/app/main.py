@@ -283,6 +283,46 @@ async def export_rooms_to_excel(db: Session = Depends(get_db)):
         logger.error(f"Error exporting rooms: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/debug/access-check")
+async def debug_access_check(telegram_id: Optional[int] = None):
+    """Проверка настроек контроля доступа"""
+    import os
+    from backend.config.admins import (
+        SUPER_ADMINS, ADMINS, MANAGERS, OPERATORS,
+        ALLOWED_USERS, is_allowed_user
+    )
+
+    # Проверяем переменные окружения
+    environment = os.getenv("ENVIRONMENT", "not_set")
+    access_control = os.getenv("ACCESS_CONTROL", "not_set")
+
+    result = {
+        "environment_variables": {
+            "ENVIRONMENT": environment,
+            "ACCESS_CONTROL": access_control
+        },
+        "allowed_users": {
+            "SUPER_ADMINS": SUPER_ADMINS,
+            "ADMINS": ADMINS,
+            "MANAGERS": MANAGERS,
+            "OPERATORS": OPERATORS,
+            "TOTAL_ALLOWED": ALLOWED_USERS
+        },
+        "total_allowed_count": len(ALLOWED_USERS)
+    }
+
+    # Если передан telegram_id, проверяем доступ
+    if telegram_id:
+        is_allowed = is_allowed_user(telegram_id)
+        result["test_user"] = {
+            "telegram_id": telegram_id,
+            "is_allowed": is_allowed,
+            "reason": "User in ALLOWED_USERS list" if is_allowed else "User NOT in ALLOWED_USERS list"
+        }
+
+    return result
+
 @rooms_router.get("")
 @rooms_router.get("/")
 async def get_rooms(

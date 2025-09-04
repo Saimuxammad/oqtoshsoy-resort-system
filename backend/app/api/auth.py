@@ -6,6 +6,7 @@ import hmac
 import json
 from urllib.parse import unquote
 import os
+import logging
 
 from ..database import get_db
 from ..models.user import User, UserRole
@@ -14,6 +15,7 @@ from ..utils.dependencies import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTE
 from ..schemas.user import UserResponse, TelegramAuthData
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Telegram bot token from environment
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -81,7 +83,7 @@ async def telegram_auth(
         verified_data = verify_telegram_auth(auth_data.initData)
         user_data = verified_data.get("user", {})
 
-        # Get or create user
+        # Get telegram_id
         telegram_id = user_data.get("id")
         if not telegram_id:
             raise HTTPException(
@@ -89,22 +91,33 @@ async def telegram_auth(
                 detail="Invalid user data"
             )
 
-        # ВКЛЮЧАЕМ проверку доступа для продакшена
-        if os.getenv("ENVIRONMENT", "development") == "production":
+        # КРИТИЧЕСКИ ВАЖНО: Проверяем ACCESS_CONTROL вместо ENVIRONMENT
+        access_control = os.getenv("ACCESS_CONTROL", "open")
+
+        logger.info(f"Access control mode: {access_control}")
+        logger.info(f"User trying to login: {telegram_id} - {user_data.get('first_name')} {user_data.get('last_name')}")
+
+        # Если ACCESS_CONTROL=strict, проверяем список пользователей
+        if access_control == "strict":
             if not is_allowed_user(telegram_id):
+                # Логируем попытку несанкционированного доступа
+                logger.warning(f"ACCESS DENIED for unauthorized user: {telegram_id}")
+                logger.warning(f"User name: {user_data.get('first_name')} {user_data.get('last_name')}")
+                logger.warning(f"Username: @{user_data.get('username', 'no_username')}")
+
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied. You are not authorized to use this system. Please contact administrator."
+                    detail=f"Kirish rad etildi! Sizning Telegram ID ({telegram_id}) ro'yxatda yo'q. Administrator bilan bog'laning."
                 )
+        else:
+            logger.warning(f"ACCESS_CONTROL is {access_control}! Access check disabled!")
 
         user = db.query(User).filter(User.telegram_id == telegram_id).first()
 
         if not user:
             # Create new user
-            # Определяем роль на основе конфигурации
             user_role_str = get_user_role(telegram_id)
 
-            # Преобразуем строковую роль в enum
             role_map = {
                 "super_admin": UserRole.SUPER_ADMIN,
                 "admin": UserRole.ADMIN,
@@ -128,13 +141,15 @@ async def telegram_auth(
             db.add(user)
             db.commit()
             db.refresh(user)
+
+            logger.info(f"New user created: {telegram_id} with role {role.value}")
         else:
             # Update existing user info
             user.first_name = user_data.get("first_name", user.first_name)
             user.last_name = user_data.get("last_name", user.last_name)
             user.username = user_data.get("username", user.username)
 
-            # Обновляем роль, если пользователь добавлен в админы
+            # Обновляем роль
             user_role_str = get_user_role(telegram_id)
             role_map = {
                 "super_admin": UserRole.SUPER_ADMIN,
@@ -148,6 +163,7 @@ async def telegram_auth(
             if new_role != user.role:
                 user.role = new_role
                 user.is_admin = new_role in [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+                logger.info(f"User {telegram_id} role updated to {new_role.value}")
 
             db.commit()
 
@@ -157,6 +173,8 @@ async def telegram_auth(
             data={"user_id": user.id},
             expires_delta=access_token_expires
         )
+
+        logger.info(f"User {telegram_id} successfully authenticated with role {user.role.value}")
 
         return {
             "token": access_token,
@@ -175,6 +193,7 @@ async def telegram_auth(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Authentication error: {e}")
         # В dev режиме возвращаем тестовый токен
         if os.getenv("ENVIRONMENT", "development") == "development":
             return {
