@@ -87,7 +87,7 @@ const translations = {
 
   ru: {
     // Navigation
-    rooms: 'Номера',
+    rooms: 'Xonalar',
     bookings: 'Брони',
     calendar: 'Календарь',
     analytics: 'Аналитика',
