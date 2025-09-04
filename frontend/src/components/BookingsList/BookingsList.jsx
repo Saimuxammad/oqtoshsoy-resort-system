@@ -9,9 +9,12 @@ import { uz } from 'date-fns/locale';
 import { ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
-export function BookingsList() {
+export function BookingsList({ currentUser }) {  // ← ДОБАВИЛИ currentUser
   const [filters, setFilters] = useState({});
   const queryClient = useQueryClient();
+
+  // Проверяем права доступа
+  const canDelete = currentUser?.is_admin || currentUser?.can_modify;
 
   const { data: bookings, isLoading, refetch } = useQuery(
     ['bookings', filters],
@@ -25,51 +28,37 @@ export function BookingsList() {
   );
 
   const deleteMutation = useMutation(
-    (bookingId) => {
-      console.log('[BookingsList] Deleting booking with ID:', bookingId);
-      return bookingService.deleteBooking(bookingId);
-    },
+    (bookingId) => bookingService.deleteBooking(bookingId),
     {
       onSuccess: (data, bookingId) => {
-        console.log('[BookingsList] Successfully deleted booking:', bookingId);
         queryClient.invalidateQueries('bookings');
         queryClient.invalidateQueries('rooms');
-        toast.success('Bron muvaffaqiyatli o\'chirildi');
+        toast.success("Bron muvaffaqiyatli o'chirildi");
       },
       onError: (error, bookingId) => {
-        console.error('[BookingsList] Delete error for booking', bookingId, ':', error);
-        console.error('Error response:', error.response);
-
         if (error.response?.status === 404) {
           toast.error(`Bron #${bookingId} topilmadi`);
-        } else if (error.response?.status === 405) {
-          toast.error('Server xatosi: Method Not Allowed');
         } else {
-          toast.error(error.response?.data?.detail || 'Bronni o\'chirishda xatolik');
+          toast.error(error.response?.data?.detail || "Bronni o'chirishda xatolik");
         }
       }
     }
   );
 
   const handleDelete = (booking) => {
-    console.log('[BookingsList] handleDelete called with booking:', booking);
+    if (!canDelete) {
+      toast.error("Sizda o'chirish huquqi yo'q");
+      return;
+    }
 
-    // Проверяем что у нас есть правильный ID
     const bookingId = booking.id;
-
     if (!bookingId) {
-      console.error('[BookingsList] No booking ID provided');
       toast.error('Bron ID topilmadi');
       return;
     }
 
-    console.log('[BookingsList] Confirming deletion for booking ID:', bookingId);
-
     if (window.confirm(`Bron #${bookingId} ni o'chirishni tasdiqlaysizmi?`)) {
-      console.log('[BookingsList] User confirmed deletion');
       deleteMutation.mutate(bookingId);
-    } else {
-      console.log('[BookingsList] User cancelled deletion');
     }
   };
 
@@ -78,13 +67,13 @@ export function BookingsList() {
     toast.success('Yangilandi');
   };
 
-  if (isLoading) return <Loading />;
+  if (isLoading) return <Loading text="Bronlar yuklanmoqda..." />;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
-          Barcha bronlar {bookings && `(${bookings.length})`}
+          Barcha bronlar {bookings && `(${bookings.length} ta)`}
         </h2>
         <Button
           variant="secondary"
@@ -92,7 +81,7 @@ export function BookingsList() {
           onClick={handleRefresh}
         >
           <ArrowPathIcon className="h-4 w-4 mr-2" />
-          Qayta yuklash
+          Yangilash
         </Button>
       </div>
 
@@ -137,19 +126,30 @@ export function BookingsList() {
                     )}
                   </div>
 
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => handleDelete(booking)}
-                    loading={deleteMutation.isLoading}
-                    title={`Bron #${booking.id} ni bekor qilish`}
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </Button>
+                  {/* ВОТ ЗДЕСЬ ГЛАВНОЕ ИЗМЕНЕНИЕ - КНОПКА ПОКАЗЫВАЕТСЯ ТОЛЬКО АДМИНАМ */}
+                  {canDelete && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDelete(booking)}
+                      loading={deleteMutation.isLoading}
+                      title={`Bron #${booking.id} ni bekor qilish`}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {!canDelete && (
+        <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <p className="text-sm text-gray-600">
+            💡 Eslatma: Sizda faqat ko'rish huquqi mavjud. Bronlarni o'chirish uchun administrator bilan bog'laning.
+          </p>
         </div>
       )}
     </div>

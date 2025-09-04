@@ -7,7 +7,7 @@ import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { roomService } from '../../services/roomService';
 
-export function RoomList({ onEditRoom, onViewCalendar }) {
+export function RoomList({ onEditRoom, onViewCalendar, currentUser }) {
   const [filters, setFilters] = useState({});
   const [rooms, setRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,18 +18,12 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
       setIsLoading(true);
       setError(null);
 
-      console.log('[RoomList] Loading rooms with filters:', filters);
-
-      // Используем roomService для получения комнат
       const data = await roomService.getRooms(filters);
-
-      console.log('[RoomList] Received rooms:', data.length);
 
       if (Array.isArray(data)) {
         setRooms(data);
-        toast.success(`${data.length} xona yuklandi`);
+        toast.success(`${data.length} ta xona yuklandi`);
       } else {
-        console.error('[RoomList] Data is not an array:', data);
         setRooms([]);
         toast.error('Xonalar formatida xatolik');
       }
@@ -45,18 +39,17 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
 
   useEffect(() => {
     loadRooms();
-  }, [filters]); // Перезагружаем при изменении фильтров
+  }, [filters]);
 
   const handleRefresh = () => {
     loadRooms();
   };
 
   const handleFilterChange = (newFilters) => {
-    console.log('[RoomList] Filter changed:', newFilters);
     setFilters(newFilters);
   };
 
-  if (isLoading) return <Loading />;
+  if (isLoading) return <Loading text="Xonalar yuklanmoqda..." />;
 
   if (error) {
     return (
@@ -71,7 +64,6 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
     );
   }
 
-  // Группируем комнаты по типу для удобного отображения
   const groupedRooms = rooms.reduce((groups, room) => {
     const type = room.room_type;
     if (!groups[type]) {
@@ -90,7 +82,7 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
       <div className="flex-1">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
-            Xonalar ro'yxati ({rooms.length})
+            Xonalar ro'yxati ({rooms.length} ta)
           </h2>
           <Button
             variant="secondary"
@@ -98,7 +90,7 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
             onClick={handleRefresh}
           >
             <ArrowPathIcon className="h-4 w-4 mr-2" />
-            Qayta yuklash
+            Yangilash
           </Button>
         </div>
 
@@ -107,15 +99,13 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
             <div className="text-gray-500">
               <p className="text-lg mb-2">Xonalar topilmadi</p>
               {filters.type && (
-                <p className="text-sm">Filterni o'chirib ko'ring</p>
+                <p className="text-sm">Filtrni o'chirib ko'ring</p>
               )}
             </div>
           </div>
         ) : (
           <div>
-            {/* Отображаем комнаты сгруппированными или все вместе */}
             {filters.type ? (
-              // Если выбран фильтр - показываем простой список
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {rooms.map((room) => (
                   <RoomCard
@@ -123,11 +113,11 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
                     room={room}
                     onEdit={onEditRoom}
                     onViewCalendar={onViewCalendar}
+                    currentUser={currentUser}
                   />
                 ))}
               </div>
             ) : (
-              // Если фильтр не выбран - группируем по типам
               <div className="space-y-6">
                 {Object.entries(groupedRooms).map(([type, typeRooms]) => (
                   <div key={type}>
@@ -141,6 +131,7 @@ export function RoomList({ onEditRoom, onViewCalendar }) {
                           room={room}
                           onEdit={onEditRoom}
                           onViewCalendar={onViewCalendar}
+                          currentUser={currentUser}
                         />
                       ))}
                     </div>
