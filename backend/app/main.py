@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, APIRouter
+from fastapi import FastAPI, HTTPException, Depends, APIRouter, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
@@ -15,11 +15,6 @@ import pandas as pd
 
 from .database import engine, get_db
 
-# ВАЖНО: Импортируем систему авторизации
-from .api import auth
-from .utils.dependencies import get_current_user
-from .models.user import User
-
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,6 +26,22 @@ room.Base.metadata.create_all(bind=engine)
 booking.Base.metadata.create_all(bind=engine)
 user.Base.metadata.create_all(bind=engine)
 history.Base.metadata.create_all(bind=engine)
+
+# ПРОСТАЯ ПРОВЕРКА ДОСТУПА БЕЗ TELEGRAM
+ALLOWED_ACCESS_KEYS = {
+    "admin_key_5488749868": {"name": "Admin", "is_admin": True},
+    # Добавьте сюда ключи для других пользователей если нужно
+}
+
+
+def check_access(access_key: Optional[str] = Header(None, alias="X-Access-Key")):
+    """Простая проверка доступа через заголовок"""
+    if not access_key or access_key not in ALLOWED_ACCESS_KEYS:
+        logger.warning(f"Access denied for key: {access_key}")
+        raise HTTPException(status_code=403, detail="Access denied")
+    user_info = ALLOWED_ACCESS_KEYS[access_key]
+    logger.info(f"Access granted for: {user_info['name']}")
+    return user_info
 
 
 # Pydantic модели
@@ -80,9 +91,6 @@ app.add_middleware(
     allowed_hosts=["*"]
 )
 
-# КРИТИЧЕСКИ ВАЖНО: Регистрируем роутер авторизации
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-
 # Создаем роутеры для API
 rooms_router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 bookings_router = APIRouter(prefix="/api/bookings", tags=["bookings"])
@@ -93,14 +101,12 @@ bookings_router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 async def get_rooms(
         room_type: Optional[str] = None,
         status: Optional[str] = None,
-        db: Session = Depends(get_db),
-
+        db: Session = Depends(get_db)
+        # НЕТ АВТОРИЗАЦИИ для просмотра
 ):
     """Получить все комнаты с фильтрами"""
     try:
         from sqlalchemy import text
-
-        logger.info(f"User {current_user.telegram_id} requesting rooms list")
 
         # Получаем все комнаты
         base_query = """
@@ -171,6 +177,7 @@ async def get_rooms(
             }
 
         logger.info(f"Total occupied rooms: {len(occupied_room_ids)}")
+        logger.info(f"Occupied room IDs: {occupied_room_ids}")
 
         # Формируем результат
         rooms = []
@@ -203,7 +210,7 @@ async def get_rooms(
                 "current_booking": current_booking
             })
 
-        logger.info(f"Returning {len(rooms)} rooms to user {current_user.telegram_id}")
+        logger.info(f"Returning {len(rooms)} rooms")
         return rooms
 
     except Exception as e:
@@ -214,11 +221,7 @@ async def get_rooms(
 
 
 @rooms_router.get("/{room_id}")
-async def get_room(
-        room_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # Требуем авторизацию
-):
+async def get_room(room_id: int, db: Session = Depends(get_db)):
     """Получить комнату по ID"""
     try:
         from sqlalchemy import text
@@ -279,14 +282,12 @@ async def get_bookings(
         room_id: Optional[int] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        db: Session = Depends(get_db),
-
+        db: Session = Depends(get_db)
+        # НЕТ АВТОРИЗАЦИИ для просмотра
 ):
     """Получить все бронирования с возможностью фильтрации"""
     try:
         from sqlalchemy import text
-
-        logger.info(f"User {current_user.telegram_id} requesting bookings")
 
         # Базовый запрос
         query = """
@@ -376,15 +377,20 @@ async def get_bookings(
 async def create_booking(
         booking_data: BookingCreate,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # ОБЯЗАТЕЛЬНО: Требуем авторизацию
+        access_key: Optional[str] = Header(None, alias="X-Access-Key")
 ):
-    """Создать новое бронирование"""
+    """Создать новое бронирование - ТРЕБУЕТ КЛЮЧ ДОСТУПА"""
+
+    # Простая проверка доступа
+    if not access_key or access_key not in ALLOWED_ACCESS_KEYS:
+        logger.warning(f"Unauthorized booking attempt with key: {access_key}")
+        raise HTTPException(status_code=403, detail="Access denied. Valid access key required.")
+
+    user_info = ALLOWED_ACCESS_KEYS[access_key]
+    logger.info(f"{user_info['name']} creating booking for room {booking_data.room_id}")
+
     try:
         from sqlalchemy import text
-
-        logger.info(f"User {current_user.telegram_id} ({current_user.first_name} {current_user.last_name}) "
-                    f"creating booking for room {booking_data.room_id} "
-                    f"from {booking_data.start_date} to {booking_data.end_date}")
 
         # Проверяем существование комнаты
         room_check = db.execute(text("""
@@ -420,7 +426,7 @@ async def create_booking(
             logger.warning(error_message)
             raise HTTPException(status_code=400, detail=error_message)
 
-        # Создаем бронирование с ID текущего пользователя
+        # Создаем бронирование
         result = db.execute(text("""
                                  INSERT INTO bookings (room_id, start_date, end_date, guest_name, notes, created_by,
                                                        created_at, updated_at)
@@ -432,14 +438,13 @@ async def create_booking(
                                 "end_date": booking_data.end_date,
                                 "guest_name": booking_data.guest_name,
                                 "notes": booking_data.notes,
-                                "created_by": current_user.id  # Используем ID авторизованного пользователя
+                                "created_by": 1  # Simplified for now
                             })
 
         booking_id = result.scalar()
         db.commit()
 
-        logger.info(
-            f"User {current_user.telegram_id} successfully created booking #{booking_id} for room #{room.room_number}")
+        logger.info(f"Successfully created booking #{booking_id} for room #{room.room_number}")
 
         # Возвращаем созданное бронирование
         booking = db.execute(text("""
@@ -489,37 +494,32 @@ async def create_booking(
 async def delete_booking(
         booking_id: int,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # ОБЯЗАТЕЛЬНО: Требуем авторизацию
+        access_key: Optional[str] = Header(None, alias="X-Access-Key")
 ):
-    """Удалить бронирование"""
+    """Удалить бронирование - ТРЕБУЕТ КЛЮЧ ДОСТУПА"""
+
+    # Простая проверка доступа
+    if not access_key or access_key not in ALLOWED_ACCESS_KEYS:
+        logger.warning(f"Unauthorized delete attempt for booking #{booking_id}")
+        raise HTTPException(status_code=403, detail="Access denied. Valid access key required.")
+
+    user_info = ALLOWED_ACCESS_KEYS[access_key]
+
     try:
         from sqlalchemy import text
 
-        logger.info(f"User {current_user.telegram_id} attempting to delete booking #{booking_id}")
+        logger.info(f"{user_info['name']} attempting to delete booking #{booking_id}")
 
-        # Проверяем существование и получаем информацию о создателе
-        check = db.execute(text("""
-                                SELECT id, room_id, created_by
-                                FROM bookings
-                                WHERE id = :id
-                                """), {"id": booking_id})
-
+        check = db.execute(text("SELECT id, room_id FROM bookings WHERE id = :id"), {"id": booking_id})
         booking = check.fetchone()
         if not booking:
             logger.warning(f"Booking {booking_id} not found")
             raise HTTPException(status_code=404, detail="Booking not found")
 
-        # Проверяем права: админы могут удалять любые, остальные - только свои
-        if not current_user.is_admin and booking.created_by != current_user.id:
-            logger.warning(f"User {current_user.telegram_id} tried to delete booking #{booking_id} "
-                           f"created by user {booking.created_by}")
-            raise HTTPException(status_code=403,
-                                detail="Siz faqat o'zingiz yaratgan bronlarni o'chira olasiz")
-
         db.execute(text("DELETE FROM bookings WHERE id = :id"), {"id": booking_id})
         db.commit()
 
-        logger.info(f"User {current_user.telegram_id} successfully deleted booking #{booking_id}")
+        logger.info(f"{user_info['name']} successfully deleted booking #{booking_id}")
         return {"message": "Booking deleted successfully", "id": booking_id}
 
     except HTTPException:
@@ -529,52 +529,28 @@ async def delete_booking(
         logger.error(f"Error deleting booking {booking_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 4. Добавьте этот эндпоинт для проверки авторизации:
-@app.get("/api/auth/check")
-async def check_auth():
-    """Проверка доступности API без авторизации"""
-    return {"status": "ok", "auth_required": False}
 
-# 5. Измените auth placeholder на рабочий:
-@app.get("/api/auth/login")
-async def auth_placeholder():
-    """Временный токен для разработки"""
-    return {
-        "token": "dev_token_123",
-        "user": {
-            "id": 1,
-            "name": "Test User",
-            "telegram_id": 123456789,
-            "is_admin": False
-        }
-    }
 @bookings_router.put("/{booking_id}")
 @bookings_router.patch("/{booking_id}")
 async def update_booking(
         booking_id: int,
         booking_data: BookingUpdate,
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # Требуем авторизацию
+        access_key: Optional[str] = Header(None, alias="X-Access-Key")
 ):
-    """Обновить бронирование"""
+    """Обновить бронирование - ТРЕБУЕТ КЛЮЧ ДОСТУПА"""
+
+    # Простая проверка доступа
+    if not access_key or access_key not in ALLOWED_ACCESS_KEYS:
+        raise HTTPException(status_code=403, detail="Access denied. Valid access key required.")
+
     try:
         from sqlalchemy import text
 
-        # Проверяем существование и права
-        check = db.execute(text("""
-                                SELECT *
-                                FROM bookings
-                                WHERE id = :id
-                                """), {"id": booking_id})
-
+        check = db.execute(text("SELECT * FROM bookings WHERE id = :id"), {"id": booking_id})
         existing = check.fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Booking not found")
-
-        # Проверяем права: админы могут редактировать любые, остальные - только свои
-        if not current_user.is_admin and existing.created_by != current_user.id:
-            raise HTTPException(status_code=403,
-                                detail="Siz faqat o'zingiz yaratgan bronlarni tahrirlashingiz mumkin")
 
         # Если обновляются даты, проверяем конфликты
         check_start = booking_data.start_date if booking_data.start_date else existing.start_date
@@ -623,8 +599,6 @@ async def update_booking(
             db.execute(text(query), params)
             db.commit()
 
-        logger.info(f"User {current_user.telegram_id} updated booking #{booking_id}")
-
         booking = db.execute(text("""
                                   SELECT b.*, r.room_number, r.room_type
                                   FROM bookings b
@@ -668,190 +642,6 @@ async def update_booking(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Эндпоинты экспорта в Excel
-@app.get("/api/export/bookings")
-async def export_bookings_to_excel(
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # Требуем авторизацию
-):
-    """Экспорт всех бронирований в Excel файл"""
-    try:
-        from sqlalchemy import text
-
-        # Базовый запрос
-        query = """
-                SELECT b.id          as "Bron ID", \
-                       r.room_number as "Xona raqami", \
-                       r.room_type   as "Xona turi", \
-                       b.guest_name  as "Mehmon ismi", \
-                       b.start_date  as "Kirish sanasi", \
-                       b.end_date    as "Chiqish sanasi", \
-                       b.notes       as "Izohlar", \
-                       b.created_at  as "Yaratilgan vaqt", \
-                       CASE \
-                           WHEN b.start_date <= CURRENT_DATE AND b.end_date > CURRENT_DATE \
-                               THEN 'Band' \
-                           WHEN b.end_date < CURRENT_DATE \
-                               THEN 'Tugagan' \
-                           ELSE 'Kutilmoqda' \
-                           END       as "Status"
-                FROM bookings b
-                         LEFT JOIN rooms r ON b.room_id = r.id \
-                """
-
-        conditions = []
-        params = {}
-
-        if start_date:
-            conditions.append("b.start_date >= :start_date")
-            params['start_date'] = start_date
-
-        if end_date:
-            conditions.append("b.end_date <= :end_date")
-            params['end_date'] = end_date
-
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-
-        query += " ORDER BY b.created_at DESC"
-
-        result = db.execute(text(query), params)
-        df = pd.DataFrame(result.fetchall())
-
-        if df.empty:
-            df = pd.DataFrame(columns=[
-                "Bron ID", "Xona raqami", "Xona turi", "Mehmon ismi",
-                "Kirish sanasi", "Chiqish sanasi", "Izohlar",
-                "Yaratilgan vaqt", "Status"
-            ])
-
-        output = io.BytesIO()
-
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, sheet_name='Bronlar', index=False)
-
-            workbook = writer.book
-            worksheet = writer.sheets['Bronlar']
-
-            header_format = workbook.add_format({
-                'bold': True,
-                'text_wrap': True,
-                'valign': 'top',
-                'fg_color': '#4472C4',
-                'font_color': 'white',
-                'border': 1
-            })
-
-            for col_num, value in enumerate(df.columns.values):
-                worksheet.write(0, col_num, value, header_format)
-
-            worksheet.set_column('A:A', 10)
-            worksheet.set_column('B:B', 15)
-            worksheet.set_column('C:C', 25)
-            worksheet.set_column('D:D', 30)
-            worksheet.set_column('E:F', 15)
-            worksheet.set_column('G:G', 40)
-            worksheet.set_column('H:H', 20)
-            worksheet.set_column('I:I', 15)
-
-        output.seek(0)
-        filename = f"bronlar_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-        return StreamingResponse(
-            io.BytesIO(output.getvalue()),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-
-    except Exception as e:
-        logger.error(f"Error exporting bookings: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/export/rooms")
-async def export_rooms_to_excel(
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)  # Требуем авторизацию
-):
-    """Экспорт информации о комнатах в Excel файл"""
-    try:
-        from sqlalchemy import text
-
-        today = date.today()
-
-        query = """
-                SELECT r.id              as "ID", \
-                       r.room_number     as "Xona raqami", \
-                       r.room_type       as "Xona turi", \
-                       r.capacity        as "Sig'im", \
-                       r.price_per_night as "Kunlik narx", \
-                       CASE \
-                           WHEN EXISTS (SELECT 1 \
-                                        FROM bookings b \
-                                        WHERE b.room_id = r.id \
-                                          AND b.start_date <= :today \
-                                          AND b.end_date > :today) THEN 'Band' \
-                           ELSE 'Bo''sh' \
-                           END           as "Holati", \
-                       r.description     as "Tavsif", \
-                       r.amenities       as "Qulayliklar"
-                FROM rooms r
-                ORDER BY r.id \
-                """
-
-        result = db.execute(text(query), {"today": today})
-        df = pd.DataFrame(result.fetchall())
-
-        if df.empty:
-            df = pd.DataFrame(columns=[
-                "ID", "Xona raqami", "Xona turi", "Sig'im",
-                "Kunlik narx", "Holati", "Tavsif", "Qulayliklar"
-            ])
-
-        output = io.BytesIO()
-
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, sheet_name='Xonalar', index=False)
-
-            workbook = writer.book
-            worksheet = writer.sheets['Xonalar']
-
-            header_format = workbook.add_format({
-                'bold': True,
-                'text_wrap': True,
-                'valign': 'top',
-                'fg_color': '#4472C4',
-                'font_color': 'white',
-                'border': 1
-            })
-
-            for col_num, value in enumerate(df.columns.values):
-                worksheet.write(0, col_num, value, header_format)
-
-            worksheet.set_column('A:A', 8)
-            worksheet.set_column('B:B', 15)
-            worksheet.set_column('C:C', 25)
-            worksheet.set_column('D:D', 10)
-            worksheet.set_column('E:E', 15)
-            worksheet.set_column('F:F', 10)
-            worksheet.set_column('G:H', 30)
-
-        output.seek(0)
-        filename = f"xonalar_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-        return StreamingResponse(
-            io.BytesIO(output.getvalue()),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-
-    except Exception as e:
-        logger.error(f"Error exporting rooms: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # Регистрируем роутеры
 app.include_router(rooms_router)
 app.include_router(bookings_router)
@@ -859,13 +649,23 @@ app.include_router(bookings_router)
 
 # Дополнительные эндпоинты
 @app.get("/api/analytics")
-async def analytics_placeholder(current_user: User = Depends(get_current_user)):
+async def analytics_placeholder():
     return {"message": "Analytics module is under development"}
 
 
+@app.get("/api/export")
+async def export_placeholder():
+    return {"message": "Export module is under development"}
+
+
 @app.get("/api/history")
-async def history_placeholder(current_user: User = Depends(get_current_user)):
+async def history_placeholder():
     return {"message": "History module is under development"}
+
+
+@app.get("/api/auth/login")
+async def auth_placeholder():
+    return {"token": "dev_token", "user": {"id": 1, "name": "Test User"}}
 
 
 @app.get("/")
@@ -882,18 +682,10 @@ async def api_root():
     return {"message": "API is running", "version": "2.0.0"}
 
 
-# Отладочные эндпоинты (только для админов)
+# Отладочный эндпоинт
 @app.get("/api/debug/room-status")
-async def debug_room_status(
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
+async def debug_room_status(db: Session = Depends(get_db)):
     """Отладочный эндпоинт для проверки статуса комнат"""
-
-    # Только админы могут использовать отладочные эндпоинты
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-
     try:
         from sqlalchemy import text
 
@@ -936,43 +728,6 @@ async def debug_room_status(
     except Exception as e:
         logger.error(f"Error in debug_room_status: {e}")
         return {"error": str(e)}
-
-
-@app.get("/api/debug/access-check")
-async def debug_access_check(telegram_id: Optional[int] = None):
-    """Проверка настроек контроля доступа (публичный эндпоинт для тестирования)"""
-    from backend.config.admins import (
-        SUPER_ADMINS, ADMINS, MANAGERS, OPERATORS,
-        ALLOWED_USERS, is_allowed_user
-    )
-
-    environment = os.getenv("ENVIRONMENT", "not_set")
-    access_control = os.getenv("ACCESS_CONTROL", "not_set")
-
-    result = {
-        "environment_variables": {
-            "ENVIRONMENT": environment,
-            "ACCESS_CONTROL": access_control
-        },
-        "allowed_users": {
-            "SUPER_ADMINS": SUPER_ADMINS,
-            "ADMINS": ADMINS,
-            "MANAGERS": MANAGERS,
-            "OPERATORS": OPERATORS,
-            "TOTAL_ALLOWED": ALLOWED_USERS
-        },
-        "total_allowed_count": len(ALLOWED_USERS)
-    }
-
-    if telegram_id:
-        is_allowed = is_allowed_user(telegram_id)
-        result["test_user"] = {
-            "telegram_id": telegram_id,
-            "is_allowed": is_allowed,
-            "reason": "User in ALLOWED_USERS list" if is_allowed else "User NOT in ALLOWED_USERS list"
-        }
-
-    return result
 
 
 if __name__ == "__main__":
