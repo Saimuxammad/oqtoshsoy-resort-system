@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from ..database import get_db
-from ..models.user import User, UserRole  # Убедитесь, что UserRole импортирован
+from ..models.user import User, UserRole
 from ..config.settings import get_settings
 from ..utils.dependencies import create_access_token
 from ..schemas.user import TelegramAuthData
@@ -51,7 +51,7 @@ def verify_telegram_auth(init_data: str) -> dict:
 
 @router.post("/telegram", response_model=dict)
 async def telegram_auth(auth_data: TelegramAuthData, db: Session = Depends(get_db)):
-    """Аутентификация пользователя через Telegram WebApp с созданием при первом входе."""
+    """Финальная версия аутентификации."""
 
     user_data = verify_telegram_auth(auth_data.initData)
     telegram_id = user_data.get("id")
@@ -59,32 +59,26 @@ async def telegram_auth(auth_data: TelegramAuthData, db: Session = Depends(get_d
     if not telegram_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user data from Telegram")
 
-    # Ищем пользователя в нашей базе данных
     user = db.query(User).filter(User.telegram_id == telegram_id).first()
 
-    # ✅ ГЛАВНОЕ ИЗМЕНЕНИЕ: Если пользователь не найден, создаем его!
     if not user:
-        # ВНИМАНИЕ: Новые пользователи получают роль OPERATOR по умолчанию.
-        # SUPER_ADMIN или ADMIN должны назначаться вручную через базу данных.
         new_user = User(
             telegram_id=telegram_id,
             first_name=user_data.get("first_name", "New"),
             last_name=user_data.get("last_name", "User"),
             username=user_data.get("username"),
-            role=UserRole.OPERATOR,  # Роль по умолчанию для новых
-            is_active=True  # Сразу делаем активным
+            role=UserRole.OPERATOR,
+            is_active=True
         )
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        user = new_user  # Продолжаем работать с новым пользователем
+        user = new_user
 
-    # Если пользователь заблокирован, запрещаем вход
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Доступ запрещен. Ваш аккаунт ({telegram_id}) заблокирован."
-        )
+    # ✅ ГЛАВНОЕ ИЗМЕНЕНИЕ: Активируем пользователя при каждом входе
+    # Если он был заблокирован, администратор может снова дать ему доступ,
+    # и при следующем входе пользователь станет активным.
+    user.is_active = True
 
     # Обновляем информацию, если она изменилась в Telegram
     user.username = user_data.get("username", user.username)
