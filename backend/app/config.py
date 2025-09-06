@@ -1,31 +1,26 @@
+# file: backend/app/config.py
 from pydantic_settings import BaseSettings
-from typing import List, Union
-from functools import cached_property
+from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    # Загружаем переменные из .env файла
     database_url: str
     telegram_bot_token: str
-    telegram_web_app_secret: str
     secret_key: str
-    redis_url: str = "redis://default:AbPQAAIjcDEzMTRiYzM1NDZhZjQ0MGM4YmQ5NDFlYWRjYTliZjE3OHAxMA@desired-sheepdog-46032.upstash.io:6379"
     environment: str = "development"
-    allowed_telegram_ids: str = "5488749868"  # Изменено на str
-    web_app_url: str = "http://localhost:5173"  # Добавлено
+
+    # Настройки для JWT токенов
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7  # 7 дней
 
     class Config:
         env_file = ".env"
-        extra = "allow"  # Разрешаем дополнительные поля
-
-    @cached_property
-    def parse_allowed_ids(self) -> List[int]:
-        """Parse allowed Telegram IDs from string"""
-        if not self.allowed_telegram_ids:
-            return []
-        try:
-            return [int(id.strip()) for id in self.allowed_telegram_ids.split(",") if id.strip()]
-        except ValueError:
-            return []
+        env_file_encoding = 'utf-8'
 
 
-settings = Settings()
+# Используем lru_cache для создания синглтона настроек,
+# чтобы файл .env читался только один раз.
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
