@@ -15,7 +15,7 @@ from .database import engine, get_db
 from fastapi.responses import StreamingResponse
 import io
 import pandas as pd
-from .api import auth_fixed as auth
+from .api import auth
 from .utils.dependencies import get_current_user
 from .models.user import User
 # Настройка логирования
