@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from ..database import get_db
-from ..models.user import User, UserRole
+from ..models.user import User
+# ✅ ИСПРАВЛЕННЫЙ ИМПОРТ
 from ..config import get_settings
 from ..utils.dependencies import create_access_token
-from ..schemas.user import TelegramAuthData  # Убедитесь, что эта Pydantic модель существует
+from ..schemas.user import TelegramAuthData
 
 router = APIRouter()
 settings = get_settings()
@@ -19,7 +20,6 @@ settings = get_settings()
 
 def verify_telegram_auth(init_data: str) -> dict:
     """Проверяет данные аутентификации от Telegram WebApp."""
-    # ❌ Убрана лазейка для dev-режима. Проверка обязательна всегда.
     if not settings.telegram_bot_token:
         raise HTTPException(status_code=500, detail="Bot token not configured")
 
@@ -54,24 +54,20 @@ def verify_telegram_auth(init_data: str) -> dict:
 async def telegram_auth(auth_data: TelegramAuthData, db: Session = Depends(get_db)):
     """Аутентификация пользователя через Telegram WebApp."""
 
-    # Шаг 1: Проверяем, что данные действительно пришли от Telegram
     user_data = verify_telegram_auth(auth_data.initData)
     telegram_id = user_data.get("id")
 
     if not telegram_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user data from Telegram")
 
-    # Шаг 2: ✅ Проверяем пользователя в НАШЕЙ базе данных
     user = db.query(User).filter(User.telegram_id == telegram_id).first()
 
-    # Шаг 3: Если пользователя нет в БД или он неактивен - доступ запрещен
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Доступ запрещен. Ваш Telegram ID ({telegram_id}) не зарегистрирован или заблокирован."
         )
 
-    # Шаг 4: Если все проверки пройдены, обновляем данные и создаем токен
     user.username = user_data.get("username", user.username)
     user.first_name = user_data.get("first_name", user.first_name)
     user.last_name = user_data.get("last_name", user.last_name)

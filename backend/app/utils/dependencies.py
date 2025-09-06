@@ -8,12 +8,10 @@ from typing import Optional
 
 from ..database import get_db
 from ..models.user import User, UserRole
-from ..config import get_settings  # ✅ Импортируем безопасные настройки
+# ✅ ИСПРАВЛЕННЫЙ ИМПОРТ
+from ..config import get_settings
 
-# Инициализируем настройки
 settings = get_settings()
-
-# Схема аутентификации
 security = HTTPBearer()
 
 
@@ -26,7 +24,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
 
     to_encode.update({"exp": expire})
-    # ✅ Используем секретный ключ из настроек
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
     return encoded_jwt
 
@@ -40,8 +37,6 @@ async def get_current_user(
     """
     token = credentials.credentials
 
-    # ❌ УДАЛЕНА УЯЗВИМОСТЬ С "dev_token". Теперь любой запрос требует валидный токен.
-
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -49,7 +44,6 @@ async def get_current_user(
     )
 
     try:
-        # ✅ Декодируем токен с использованием безопасного ключа и алгоритма
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id: int = payload.get("user_id")
         if user_id is None:
@@ -64,7 +58,6 @@ async def get_current_user(
             detail="User not found"
         )
 
-    # Проверяем, что пользователь активен
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -74,7 +67,6 @@ async def get_current_user(
     return user
 
 
-# Функции-зависимости для проверки ролей
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Требует роль админа или выше"""
     if current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
