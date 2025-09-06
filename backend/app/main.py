@@ -199,6 +199,47 @@ async def export_bookings_to_excel(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/test/check-access")
+async def test_check_access(request: dict):
+    """Тестовый эндпоинт для проверки доступа"""
+    import os
+    from app.config.admins import SUPER_ADMINS, ADMINS, MANAGERS, OPERATORS, ALLOWED_USERS
+
+    # Получаем ID из запроса
+    test_id = request.get("telegram_id")
+
+    # Читаем переменную окружения напрямую
+    env_ids = os.getenv("ALLOWED_TELEGRAM_IDS", "")
+    env_ids_list = []
+    if env_ids:
+        try:
+            env_ids_list = [int(id.strip()) for id in env_ids.split(",") if id.strip()]
+        except:
+            env_ids_list = []
+
+    # Проверяем доступ разными способами
+    result = {
+        "test_telegram_id": test_id,
+        "environment_variable": {
+            "raw": env_ids,
+            "parsed": env_ids_list,
+            "contains_test_id": test_id in env_ids_list if test_id else False
+        },
+        "config_arrays": {
+            "SUPER_ADMINS": SUPER_ADMINS,
+            "ADMINS": ADMINS,
+            "MANAGERS": MANAGERS,
+            "OPERATORS": OPERATORS,
+            "ALLOWED_USERS": ALLOWED_USERS,
+            "total_count": len(ALLOWED_USERS)
+        },
+        "access_check": {
+            "is_in_ALLOWED_USERS": test_id in ALLOWED_USERS if test_id else False,
+            "is_in_env_list": test_id in env_ids_list if test_id else False
+        }
+    }
+
+    return result
 @app.get("/api/export/rooms")
 async def export_rooms_to_excel(db: Session = Depends(get_db)):
     """Экспорт информации о комнатах в Excel файл"""

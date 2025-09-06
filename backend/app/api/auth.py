@@ -127,6 +127,48 @@ async def telegram_auth(
         auth_data: TelegramAuthData,
         db: Session = Depends(get_db)
 ):
+    """Authenticate user via Telegram WebApp"""
+
+    # Добавьте эти логи в начало функции
+    print("=" * 60)
+    print("[AUTH] New authentication attempt")
+    print(f"[AUTH] Received initData length: {len(auth_data.initData) if auth_data.initData else 0}")
+
+    try:
+        # Verify Telegram auth data
+        verified_data = verify_telegram_auth(auth_data.initData)
+        user_data = verified_data.get("user", {})
+
+        telegram_id = user_data.get("id")
+        print(f"[AUTH] Extracted Telegram ID: {telegram_id} (type: {type(telegram_id)})")
+
+        # Преобразуем в int если это строка
+        if isinstance(telegram_id, str):
+            telegram_id = int(telegram_id)
+            print(f"[AUTH] Converted to int: {telegram_id}")
+
+        # КРИТИЧЕСКАЯ ПРОВЕРКА
+        print(f"[AUTH] Checking access for ID: {telegram_id}")
+        print(f"[AUTH] Current ALLOWED_USERS: {ALLOWED_USERS}")
+
+        if not is_allowed_user(telegram_id):
+            print(f"[AUTH] ❌ ACCESS DENIED - ID {telegram_id} not in whitelist")
+            print("=" * 60)
+
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied for Telegram ID {telegram_id}"
+            )
+
+        print(f"[AUTH] ✅ ACCESS GRANTED for ID {telegram_id}")
+        print("=" * 60)
+
+        # ... остальной код
+@router.post("/telegram", response_model=dict)
+async def telegram_auth(
+        auth_data: TelegramAuthData,
+        db: Session = Depends(get_db)
+):
     """
     Аутентификация через Telegram WebApp.
     СТРОГАЯ ПРОВЕРКА WHITELIST!
