@@ -15,6 +15,7 @@ from .database import engine, get_db
 from fastapi.responses import StreamingResponse
 import io
 import pandas as pd
+from .api import auth_fixed as auth
 from .api import auth
 from .utils.dependencies import get_current_user
 from .models.user import User
@@ -82,7 +83,7 @@ app.add_middleware(
 rooms_router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 bookings_router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
-
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 # Добавьте этот эндпоинт в main.py после других эндпоинтов
 
 @app.get("/api/export/bookings")
