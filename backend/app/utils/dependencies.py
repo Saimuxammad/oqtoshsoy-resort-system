@@ -9,7 +9,7 @@ from typing import Optional
 from ..database import get_db
 from ..models.user import User, UserRole
 # ✅ ИСПРАВЛЕННЫЙ ИМПОРТ
-from ..config import get_settings
+from ..config.config import get_settings
 
 settings = get_settings()
 security = HTTPBearer()

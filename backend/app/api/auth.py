@@ -10,7 +10,7 @@ from datetime import timedelta
 from ..database import get_db
 from ..models.user import User
 # ✅ ИСПРАВЛЕННЫЙ ИМПОРТ
-from ..config import get_settings
+from ..config.config import get_settings
 from ..utils.dependencies import create_access_token
 from ..schemas.user import TelegramAuthData
 
